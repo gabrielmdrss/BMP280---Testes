@@ -47,47 +47,41 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+SPI_HandleTypeDef hspi2;
+DMA_HandleTypeDef hdma_spi2_rx;
+DMA_HandleTypeDef hdma_spi2_tx;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-//const float accelScalingFactor = ((float) 4 / 32768);//fator de escala do acelerômetro
-//const float gyroScalingFactor = ((float) 500 / 32768);//fator de escala do giroscópio
-//
-//uint8_t rawData[14];							//valores crus dos sensores
-//int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;	//valores crus do acelerômetro
-//int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-//int16_t RAW_TEMP;								//valor cru da temperatura
+int teste = 0;
+int contador = 0;
+const float accelScalingFactor = ((float) 4 / 32768);//fator de escala do acelerômetro
+const float gyroScalingFactor = ((float) 500 / 32768);//fator de escala do giroscópio
+
+float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
+			somGyros_z, temp = 0;
+
+const int16_t RAW_ACCEL_X_OFFSET = -128;	//offsets do acelerômetro
+const int16_t RAW_ACCEL_Y_OFFSET = 48;
+const int16_t RAW_ACCEL_Z_OFFSET = 87;
+const int16_t RAW_GYRO_X_OFFSET = 125;	//offsets do giroscópio
+const int16_t RAW_GYRO_Y_OFFSET = -359;
+const int16_t RAW_GYRO_Z_OFFSET = 15;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
+static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
-float calcular_rms(uint16_t arr[]);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-uint16_t buffer_value_ad1=0;
-#define BUFFER_SIZE 5000
-uint16_t buffer1_adc1[BUFFER_SIZE];
-uint16_t buffer2_adc1[BUFFER_SIZE];
-uint16_t buffer1[BUFFER_SIZE];
-uint16_t buffer2[BUFFER_SIZE];
-uint16_t buffer1_ad2[BUFFER_SIZE];
-uint16_t buffer2_ad2[BUFFER_SIZE];
-uint16_t buffer1_ad3[BUFFER_SIZE];
-uint16_t buffer2_ad3[BUFFER_SIZE];
-float media_return=0.0;
-uint16_t quantidade_soma_media_fase1=0;
-float soma_media_fase1=0.0;
-float media_fases1=0;
-int buffer_value=0;
-int quantidade_soma_media=0;
-float soma_media=0.0;
-float soma_media_2=0.0;
-float soma_media_3=0.0;
 /* USER CODE END 0 */
 
 /**
@@ -119,7 +113,9 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_USART1_UART_Init();
+  MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -129,20 +125,23 @@ int main(void)
 
   	SPI2_Init();		//inicialização da interface SPI2
 
-  	printf("\n--------  Exemplo de aplicação de uso MPU-9250 via SPI  --------\n\n");
-  	HAL_Delay(2000);
+	printf("\n--------  Exemplo de aplicação de uso MPU-9250 via SPI  --------\n\n");
+	HAL_Delay(2000);
 
 	MPU6500_Config();
 	HAL_Delay(1000);
 
-  	while(1)
-  	{
+	SysTick->CTRL = 0;			//desabilita o SysTick
+	SysTick->LOAD = 2.1e5;		//carrega o registrador Reload Value (interrupções a cada 500ms)
+	SysTick->VAL = 0;			//reinicia a contagem do contador
+	SysTick->CTRL = 0b011;		//liga o Systick, habilita a interrupção e seleciona a fonte de clock
 
-  		//mpu_9250_offsets();
-  		mpu_9250_amostras();
+  while (1)
+  {
+    /* USER CODE END WHILE */
 
-  	}
-
+    /* USER CODE BEGIN 3 */
+  }
   /* USER CODE END 3 */
 }
 
@@ -190,6 +189,44 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief SPI2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI2_Init(void)
+{
+
+  /* USER CODE BEGIN SPI2_Init 0 */
+
+  /* USER CODE END SPI2_Init 0 */
+
+  /* USER CODE BEGIN SPI2_Init 1 */
+
+  /* USER CODE END SPI2_Init 1 */
+  /* SPI2 parameter configuration*/
+  hspi2.Instance = SPI2;
+  hspi2.Init.Mode = SPI_MODE_MASTER;
+  hspi2.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi2.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI2_Init 2 */
+
+  /* USER CODE END SPI2_Init 2 */
+
 }
 
 /**
@@ -244,6 +281,25 @@ static void MX_USART1_UART_Init(void)
 	{
 		__io_putchar(__io_getchar());
 	}
+
+/**
+  * Enable DMA controller clock
+  */
+static void MX_DMA_Init(void)
+{
+
+  /* DMA controller clock enable */
+  __HAL_RCC_DMA1_CLK_ENABLE();
+
+  /* DMA interrupt init */
+  /* DMA1_Stream3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+  /* DMA1_Stream4_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
+
+}
 
 /**
   * @brief GPIO Initialization Function
@@ -445,77 +501,114 @@ void mpu_9250_offsets() {
 	somAccel_x = somAccel_y = somAccel_z = somGyros_x = somGyros_y = somGyros_z = 0;
 
 }
-
-void mpu_9250_amostras() {
-
-	const float accelScalingFactor = ((float) 4 / 32768); //fator de escala do acelerômetro
-	const float gyroScalingFactor = ((float) 500 / 32768); //fator de escala do giroscópio
-
-	uint8_t rawData[14];							//valores crus dos sensores
-	int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
-	int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-	int16_t RAW_TEMP;								//valor cru da temperatura
-	float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
-			somGyros_z = 0;
-
-//		offsets do GY-91 MPU-92.50
-//	const int16_t RAW_ACCEL_X_OFFSET = -18;	//offsets do acelerômetro
-//	const int16_t RAW_ACCEL_Y_OFFSET = -127;
-//	const int16_t RAW_ACCEL_Z_OFFSET = -537;
-//	const int16_t RAW_GYRO_X_OFFSET = -10;	//offsets do giroscópio
-//	const int16_t RAW_GYRO_Y_OFFSET = 5;
-//	const int16_t RAW_GYRO_Z_OFFSET = 20;
-
-//		offsets do MPU-65.00
-	const int16_t RAW_ACCEL_X_OFFSET = -128;	//offsets do acelerômetro
-	const int16_t RAW_ACCEL_Y_OFFSET = 48;
-	const int16_t RAW_ACCEL_Z_OFFSET = 87;
-	const int16_t RAW_GYRO_X_OFFSET = 125;	//offsets do giroscópio
-	const int16_t RAW_GYRO_Y_OFFSET = -359;
-	const int16_t RAW_GYRO_Z_OFFSET = 15;
-
-	for (int i = 0; i < 10; i++) {
-		//leitura e separação dos valores crus dos sensores
-		Read_MData(0x3B, 14, rawData);
-		RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
-				+ RAW_ACCEL_X_OFFSET;
-		RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
-				+ RAW_ACCEL_Y_OFFSET;
-		RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
-				+ RAW_ACCEL_Z_OFFSET;
-		RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
-		RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9])
-				+ RAW_GYRO_X_OFFSET;
-		RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
-				+ RAW_GYRO_Y_OFFSET;
-		RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
-				+ RAW_GYRO_Z_OFFSET;
-
-		somAccel_x += RAW_ACCEL_X;
-		somAccel_y += RAW_ACCEL_Y;
-		somAccel_z += RAW_ACCEL_Z;
-		somGyros_x += RAW_GYRO_X;
-		somGyros_y += RAW_GYRO_Y;
-		somGyros_z += RAW_GYRO_Z;
-		HAL_Delay(10);
-	}
-	somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
-			10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
-	somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
-			accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
-			gyroScalingFactor, somGyros_z *= gyroScalingFactor;
-
-	//impressão dos valores escalonados
-	printf("Impressão dos valores escalonados:\n");
-	printf("ACCEL_X = %.1f\n", somAccel_x);
-	printf("ACCEL_Y = %.1f\n", somAccel_y);
-	printf("ACCEL_Z = %.1f\n\n", somAccel_z);
-	printf("GYRO_X = %.0f\n", somGyros_x);
-	printf("GYRO_Y = %.0f\n", somGyros_y);
-	printf("GYRO_Z = %.0f\n\n", somGyros_z);
-
-	printf("TEMP = %.1f°C\n\n\n\n", (float) RAW_TEMP / 333.87 + 21.0);
-}
+//void teste_fun(void){
+//	uint8_t rawData[14];							//valores crus dos sensores
+//		int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
+//		int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
+//		int16_t RAW_TEMP;								//valor cru da temperatura
+//
+//		Read_MData(0x3B, 14, rawData);
+//		RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
+//				+ RAW_ACCEL_X_OFFSET;
+//		RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
+//				+ RAW_ACCEL_Y_OFFSET;
+//		RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
+//				+ RAW_ACCEL_Z_OFFSET;
+//		RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
+//		RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9]) + RAW_GYRO_X_OFFSET;
+//		RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
+//				+ RAW_GYRO_Y_OFFSET;
+//		RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
+//				+ RAW_GYRO_Z_OFFSET;
+//
+//		somAccel_x += RAW_ACCEL_X;
+//		somAccel_y += RAW_ACCEL_Y;
+//		somAccel_z += RAW_ACCEL_Z;
+//		somGyros_x += RAW_GYRO_X;
+//		somGyros_y += RAW_GYRO_Y;
+//		somGyros_z += RAW_GYRO_Z;
+//		temp = RAW_TEMP;
+//		contador += 1;
+//
+//		if(contador == 10){
+//			somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
+//					10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
+//			somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
+//					accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
+//					gyroScalingFactor, somGyros_z *= gyroScalingFactor;
+//}
+//		teste=0;
+//}
+//void mpu_9250_amostras() {
+//
+//	const float accelScalingFactor = ((float) 4 / 32768); //fator de escala do acelerômetro
+//	const float gyroScalingFactor = ((float) 500 / 32768); //fator de escala do giroscópio
+//
+//	uint8_t rawData[14];							//valores crus dos sensores
+//	int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
+//	int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
+//	int16_t RAW_TEMP;								//valor cru da temperatura
+//	float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
+//			somGyros_z = 0;
+//
+////		offsets do GY-91 MPU-92.50
+////	const int16_t RAW_ACCEL_X_OFFSET = -18;	//offsets do acelerômetro
+////	const int16_t RAW_ACCEL_Y_OFFSET = -127;
+////	const int16_t RAW_ACCEL_Z_OFFSET = -537;
+////	const int16_t RAW_GYRO_X_OFFSET = -10;	//offsets do giroscópio
+////	const int16_t RAW_GYRO_Y_OFFSET = 5;
+////	const int16_t RAW_GYRO_Z_OFFSET = 20;
+//
+////		offsets do MPU-65.00
+//	const int16_t RAW_ACCEL_X_OFFSET = -128;	//offsets do acelerômetro
+//	const int16_t RAW_ACCEL_Y_OFFSET = 48;
+//	const int16_t RAW_ACCEL_Z_OFFSET = 87;
+//	const int16_t RAW_GYRO_X_OFFSET = 125;	//offsets do giroscópio
+//	const int16_t RAW_GYRO_Y_OFFSET = -359;
+//	const int16_t RAW_GYRO_Z_OFFSET = 15;
+//
+//	for (int i = 0; i < 10; i++) {
+//		//leitura e separação dos valores crus dos sensores
+//		Read_MData(0x3B, 14, rawData);
+//		RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
+//				+ RAW_ACCEL_X_OFFSET;
+//		RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
+//				+ RAW_ACCEL_Y_OFFSET;
+//		RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
+//				+ RAW_ACCEL_Z_OFFSET;
+//		RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
+//		RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9])
+//				+ RAW_GYRO_X_OFFSET;
+//		RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
+//				+ RAW_GYRO_Y_OFFSET;
+//		RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
+//				+ RAW_GYRO_Z_OFFSET;
+//
+//		somAccel_x += RAW_ACCEL_X;
+//		somAccel_y += RAW_ACCEL_Y;
+//		somAccel_z += RAW_ACCEL_Z;
+//		somGyros_x += RAW_GYRO_X;
+//		somGyros_y += RAW_GYRO_Y;
+//		somGyros_z += RAW_GYRO_Z;
+//		HAL_Delay(10);
+//	}
+//	somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
+//			10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
+//	somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
+//			accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
+//			gyroScalingFactor, somGyros_z *= gyroScalingFactor;
+//
+//	//impressão dos valores escalonados
+//	printf("Impressão dos valores escalonados:\n");
+//	printf("ACCEL_X = %.1f\n", somAccel_x);
+//	printf("ACCEL_Y = %.1f\n", somAccel_y);
+//	printf("ACCEL_Z = %.1f\n\n", somAccel_z);
+//	printf("GYRO_X = %.0f\n", somGyros_x);
+//	printf("GYRO_Y = %.0f\n", somGyros_y);
+//	printf("GYRO_Z = %.0f\n\n", somGyros_z);
+//
+//	printf("TEMP = %.1f°C\n\n\n\n", (float) RAW_TEMP / 333.87 + 21.0);
+//}
 
 /* USER CODE END 4 */
 
