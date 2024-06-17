@@ -54,13 +54,10 @@ DMA_HandleTypeDef hdma_spi2_tx;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-int teste = 0;
+
 int contador = 0;
 const float accelScalingFactor = ((float) 4 / 32768);//fator de escala do acelerômetro
 const float gyroScalingFactor = ((float) 500 / 32768);//fator de escala do giroscópio
-
-float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
-			somGyros_z, temp = 0;
 
 const int16_t RAW_ACCEL_X_OFFSET = -128;	//offsets do acelerômetro
 const int16_t RAW_ACCEL_Y_OFFSET = 48;
@@ -68,6 +65,16 @@ const int16_t RAW_ACCEL_Z_OFFSET = 87;
 const int16_t RAW_GYRO_X_OFFSET = 125;	//offsets do giroscópio
 const int16_t RAW_GYRO_Y_OFFSET = -359;
 const int16_t RAW_GYRO_Z_OFFSET = 15;
+
+int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;	//valores crus do acelerômetro
+int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
+int16_t RAW_TEMP;								//valor cru da temperatura
+
+uint8_t array_rx[15];
+uint8_t array_tx[15] = { (0x3B | (1<<7)), 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+		0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+int verifica = 0;
+int cont = 0;
 
 /* USER CODE END PV */
 
@@ -123,10 +130,10 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
 
-  	SPI2_Init();		//inicialização da interface SPI2
+  	//SPI2_Init();		//inicialização da interface SPI2
 
 	printf("\n--------  Exemplo de aplicação de uso MPU-9250 via SPI  --------\n\n");
-	HAL_Delay(2000);
+	HAL_Delay(1000);
 
 	MPU6500_Config();
 	HAL_Delay(1000);
@@ -136,8 +143,39 @@ int main(void)
 	SysTick->VAL = 0;			//reinicia a contagem do contador
 	SysTick->CTRL = 0b011;		//liga o Systick, habilita a interrupção e seleciona a fonte de clock
 
-  while (1)
-  {
+	while (1) {
+//		if (verifica) {
+//			verifica = 0;
+//
+//
+//			int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
+//			int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;	//valores crus do giroscópio
+//			int16_t RAW_TEMP;						//valor cru da temperatura
+//
+//			Read_MData(0x3B, 14, rawData);
+//			RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
+//					+ RAW_ACCEL_X_OFFSET;
+//			RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
+//					+ RAW_ACCEL_Y_OFFSET;
+//			RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
+//					+ RAW_ACCEL_Z_OFFSET;
+//			RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
+//			RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9])
+//					+ RAW_GYRO_X_OFFSET;
+//			RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
+//					+ RAW_GYRO_Y_OFFSET;
+//			RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
+//					+ RAW_GYRO_Z_OFFSET;
+//
+//			somAccel_x += RAW_ACCEL_X;
+//			somAccel_y += RAW_ACCEL_Y;
+//			somAccel_z += RAW_ACCEL_Z;
+//			somGyros_x += RAW_GYRO_X;
+//			somGyros_y += RAW_GYRO_Y;
+//			somGyros_z += RAW_GYRO_Z;
+//
+//		}
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -213,7 +251,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi2.Init.NSS = SPI_NSS_SOFT;
+  hspi2.Init.NSS = SPI_NSS_HARD_OUTPUT;
   hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
@@ -244,43 +282,26 @@ static void MX_USART1_UART_Init(void)
   /* USER CODE BEGIN USART1_Init 1 */
 
   /* USER CODE END USART1_Init 1 */
-	__HAL_RCC_USART1_CLK_ENABLE();	//habilita o clock da USART
-		UART_HandleTypeDef huart1;
-		huart1.Instance = USART1;
-		huart1.Init.BaudRate = 1000000;	//baud rate = 1Mbps
-		huart1.Init.WordLength = UART_WORDLENGTH_8B;
-		huart1.Init.StopBits = UART_STOPBITS_1;
-		huart1.Init.Parity = UART_PARITY_NONE;
-		huart1.Init.Mode = UART_MODE_TX_RX;
-		huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-		huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-	  if (HAL_UART_Init(&huart1) != HAL_OK)
-	  {
-	    Error_Handler();
-	  }
-	  /* USER CODE BEGIN USART1_Init 2 */
-	  //Enable RX interrupt
-	  	USART1->CR1 |= USART_CR1_RXNEIE;
-	  	HAL_NVIC_EnableIRQ(USART1_IRQn);
-	  	//Delay_ms(1);
-	  /* USER CODE END USART1_Init 2 */
-	}
+  huart1.Instance = USART1;
+  huart1.Init.BaudRate = 1000000;
+  huart1.Init.WordLength = UART_WORDLENGTH_8B;
+  huart1.Init.StopBits = UART_STOPBITS_1;
+  huart1.Init.Parity = UART_PARITY_NONE;
+  huart1.Init.Mode = UART_MODE_TX_RX;
+  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN USART1_Init 2 */
+	//Enable RX interrupt
+	USART1->CR1 |= USART_CR1_RXNEIE;
+	HAL_NVIC_EnableIRQ(USART1_IRQn);
+	//Delay_ms(1);
+  /* USER CODE END USART1_Init 2 */
 
-	int __io_putchar(int ch)
-	{
-		USART1->DR=(ch & (uint16_t)0x01FF);
-		while (!(USART1->SR & USART_SR_TXE));	//espera pelo fim da transmissão do caractere para evitar a segunda transmissão antes da primeira ser concluída
-		return ch;
-	}
-	int __io_getchar(void)
-	{
-	   return (uint16_t)(USART1->DR & (uint16_t)0x01FF);
-	}
-	//ISR da USART1. Todas as ISR's estão definidas no arquivo startup_stm32.s
-	void USART1_IRQHandler(void)
-	{
-		__io_putchar(__io_getchar());
-	}
+}
 
 /**
   * Enable DMA controller clock

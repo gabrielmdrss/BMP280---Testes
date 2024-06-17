@@ -23,20 +23,11 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-extern int contador;
-extern int teste;
-extern const float accelScalingFactor;//fator de escala do acelerômetro
-extern const float gyroScalingFactor;//fator de escala do giroscópio
-
-extern float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
-			somGyros_z, temp;
-
-extern const int16_t RAW_ACCEL_X_OFFSET;	//offsets do acelerômetro
-extern const int16_t RAW_ACCEL_Y_OFFSET;
-extern const int16_t RAW_ACCEL_Z_OFFSET;
-extern const int16_t RAW_GYRO_X_OFFSET;	//offsets do giroscópio
-extern const int16_t RAW_GYRO_Y_OFFSET;
-extern const int16_t RAW_GYRO_Z_OFFSET;
+extern uint8_t array_rx[15];
+extern uint8_t array_tx[15];
+extern verifica;
+extern hspi2;
+extern cont;
 
 /* USER CODE END Includes */
 
@@ -201,56 +192,9 @@ void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
 
-	uint8_t rawData[14];							//valores crus dos sensores
-	int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
-	int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-	int16_t RAW_TEMP;								//valor cru da temperatura
-
-	Read_MData(0x3B, 14, rawData);
-	RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
-			+ RAW_ACCEL_X_OFFSET;
-	RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
-			+ RAW_ACCEL_Y_OFFSET;
-	RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
-			+ RAW_ACCEL_Z_OFFSET;
-	RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
-	RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9]) + RAW_GYRO_X_OFFSET;
-	RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
-			+ RAW_GYRO_Y_OFFSET;
-	RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
-			+ RAW_GYRO_Z_OFFSET;
-
-	somAccel_x += RAW_ACCEL_X;
-	somAccel_y += RAW_ACCEL_Y;
-	somAccel_z += RAW_ACCEL_Z;
-	somGyros_x += RAW_GYRO_X;
-	somGyros_y += RAW_GYRO_Y;
-	somGyros_z += RAW_GYRO_Z;
-	temp = RAW_TEMP;
-	contador++;
-
-	if (contador == 10) {
-		somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
-				10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
-		somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
-				accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
-				gyroScalingFactor, somGyros_z *= gyroScalingFactor;
-
-		printf("Impressão dos valores escalonados:\n");
-		printf("ACCEL_X = %.1f\n", somAccel_x);
-		printf("ACCEL_Y = %.1f\n", somAccel_y);
-		printf("ACCEL_Z = %.1f\n\n", somAccel_z);
-		printf("GYRO_X = %.0f\n", somGyros_x);
-		printf("GYRO_Y = %.0f\n", somGyros_y);
-		printf("GYRO_Z = %.0f\n\n", somGyros_z);
-
-		printf("TEMP = %.1f°C\n\n\n\n", (float) temp / 333.87 + 21.0);
-
-		contador = 0;
-		somAccel_x = somAccel_y = somAccel_z = somGyros_x = somGyros_y =
-				somGyros_z = temp = 0;
-
-	}
+	HAL_SPI_Receive_DMA(hspi2, array_rx, 15);
+	HAL_SPI_Transmit_DMA(hspi2, array_tx, 15);
+	cont += 1;
 
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
@@ -272,6 +216,9 @@ void SysTick_Handler(void)
 void DMA1_Stream3_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream3_IRQn 0 */
+
+	verifica = 1;
+//	cont += 1;
 
   /* USER CODE END DMA1_Stream3_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi2_rx);
