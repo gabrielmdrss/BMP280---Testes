@@ -23,11 +23,8 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
-extern uint8_t array_rx[15];
-extern uint8_t array_tx[15];
-extern verifica;
-extern hspi2;
-extern cont;
+extern int teste;
+extern int teste2;
 
 /* USER CODE END Includes */
 
@@ -192,9 +189,7 @@ void SysTick_Handler(void)
 {
   /* USER CODE BEGIN SysTick_IRQn 0 */
 
-	HAL_SPI_Receive_DMA(hspi2, array_rx, 15);
-	HAL_SPI_Transmit_DMA(hspi2, array_tx, 15);
-	cont += 1;
+	teste = 1;
 
   /* USER CODE END SysTick_IRQn 0 */
   HAL_IncTick();
@@ -217,9 +212,6 @@ void DMA1_Stream3_IRQHandler(void)
 {
   /* USER CODE BEGIN DMA1_Stream3_IRQn 0 */
 
-	verifica = 1;
-//	cont += 1;
-
   /* USER CODE END DMA1_Stream3_IRQn 0 */
   HAL_DMA_IRQHandler(&hdma_spi2_rx);
   /* USER CODE BEGIN DMA1_Stream3_IRQn 1 */
@@ -239,6 +231,23 @@ void DMA1_Stream4_IRQHandler(void)
   /* USER CODE BEGIN DMA1_Stream4_IRQn 1 */
 
   /* USER CODE END DMA1_Stream4_IRQn 1 */
+}
+
+/**
+  * @brief This function handles EXTI line[9:5] interrupts.
+  */
+void EXTI9_5_IRQHandler(void)
+{
+  /* USER CODE BEGIN EXTI9_5_IRQn 0 */
+
+	teste2 = 1;
+
+  /* USER CODE END EXTI9_5_IRQn 0 */
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_6);
+  HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_7);
+  /* USER CODE BEGIN EXTI9_5_IRQn 1 */
+
+  /* USER CODE END EXTI9_5_IRQn 1 */
 }
 
 /* USER CODE BEGIN 1 */
