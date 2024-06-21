@@ -132,75 +132,24 @@ int main(void)
   	SPI2_Init();		//inicialização da interface SPI2
 
 	printf("\n--------  Exemplo de aplicação de uso MPU-9250 via SPI  --------\n\n");
-	HAL_Delay(2000);
+	//HAL_Delay(2000);
 
 	MPU6500_Config();
-	HAL_Delay(1000);
+	//HAL_Delay(1000);
 
-	SysTick->CTRL = 0;			//desabilita o SysTick
-	SysTick->LOAD = 2.1e5;		//carrega o registrador Reload Value (interrupções a cada 500ms)
-	SysTick->VAL = 0;			//reinicia a contagem do contador
-	SysTick->CTRL = 0b011;		//liga o Systick, habilita a interrupção e seleciona a fonte de clock
+//	SysTick->CTRL = 0;			//desabilita o SysTick
+//	SysTick->LOAD = 2.1e5;		//carrega o registrador Reload Value (interrupções a cada 500ms)
+//	SysTick->VAL = 0;			//reinicia a contagem do contador
+//	SysTick->CTRL = 0b011;		//liga o Systick, habilita a interrupção e seleciona a fonte de clock
 
+//	Who_am_I();
   while (1)
   {
-		if (contador == 10) {
-			somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
-					10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
-			somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
-					accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
-					gyroScalingFactor, somGyros_z *= gyroScalingFactor;
 
-			printf("Impressão dos valores escalonados:\n");
-			printf("ACCEL_X = %.1f\n", somAccel_x);
-			printf("ACCEL_Y = %.1f\n", somAccel_y);
-			printf("ACCEL_Z = %.1f\n\n", somAccel_z);
-			printf("GYRO_X = %.0f\n", somGyros_x);
-			printf("GYRO_Y = %.0f\n", somGyros_y);
-			printf("GYRO_Z = %.0f\n\n", somGyros_z);
+//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
+//	  HAL_Delay(500);
+//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
 
-			printf("TEMP = %.1f°C\n\n\n\n", (float) temp / 333.87 + 21.0);
-
-			contador = 0;
-			somAccel_x = somAccel_y = somAccel_z = somGyros_x = somGyros_y =
-					somGyros_z = temp = 0;
-		}
-
-		if (teste) {
-			Read_MData(0x3B, 14, rawData);
-			RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
-					+ RAW_ACCEL_X_OFFSET;
-			RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
-					+ RAW_ACCEL_Y_OFFSET;
-			RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
-					+ RAW_ACCEL_Z_OFFSET;
-			RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
-			RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9])
-					+ RAW_GYRO_X_OFFSET;
-			RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
-					+ RAW_GYRO_Y_OFFSET;
-			RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
-					+ RAW_GYRO_Z_OFFSET;
-
-			somAccel_x += RAW_ACCEL_X;
-			somAccel_y += RAW_ACCEL_Y;
-			somAccel_z += RAW_ACCEL_Z;
-			somGyros_x += RAW_GYRO_X;
-			somGyros_y += RAW_GYRO_Y;
-			somGyros_z += RAW_GYRO_Z;
-			temp = RAW_TEMP;
-			contador++;
-			teste = 0;
-		}
-
-//	  if(teste2){
-//		  printf("oi\n\n");
-//		  teste2 = 0;
-//	  }
-//
-//	  if(HAL_GPIO_ReadPin(GPIOA, 6) == GPIO_PIN_SET){
-//		  printf("oi\n\n");
-//	  }
 
     /* USER CODE END WHILE */
 
@@ -342,6 +291,7 @@ void USART1_IRQHandler(void) {
 	__io_putchar(__io_getchar());
 }
 
+
 /**
   * Enable DMA controller clock
   */
@@ -375,14 +325,28 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+  __HAL_RCC_GPIOD_CLK_ENABLE();
+
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : PA6 PA7 */
-  GPIO_InitStruct.Pin = GPIO_PIN_6|GPIO_PIN_7;
+  /*Configure GPIO pin Output Level */
+  HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
+
+  /*Configure GPIO pin : PA3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PA6 */
+  GPIO_InitStruct.Pin = GPIO_PIN_6;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_OD;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PB12 */
@@ -392,9 +356,16 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+  /*Configure GPIO pin : PD12 */
+  GPIO_InitStruct.Pin = GPIO_PIN_12;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
+  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
@@ -402,6 +373,13 @@ static void MX_GPIO_Init(void)
 
 /* USER CODE BEGIN 4 */
 
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+//  teste2 = 1;
+	printf("Movimento Detectado\n\n");
+	EXTI->PR |= 1 << 3;
+	//HAL_Delay(100);
+}
 
 void bmp280_altitude_cTemp(){
 
@@ -561,7 +539,7 @@ void mpu_9250_offsets() {
 	somAccel_x = somAccel_y = somAccel_z = somGyros_x = somGyros_y = somGyros_z = 0;
 
 }
-//void teste_fun(void){
+//void mpu_9250_amostras(void){
 //	uint8_t rawData[14];							//valores crus dos sensores
 //		int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
 //		int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
@@ -669,6 +647,7 @@ void mpu_9250_offsets() {
 //
 //	printf("TEMP = %.1f°C\n\n\n\n", (float) RAW_TEMP / 333.87 + 21.0);
 //}
+
 
 /* USER CODE END 4 */
 

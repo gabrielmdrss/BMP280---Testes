@@ -47,6 +47,7 @@ void MPU6500_Calibration(void);
 uint8_t Read_Data(uint8_t address);									//leitura de um byte
 void Read_MData(uint8_t address, uint8_t Nbytes, uint8_t *Data);	//leitura de múltiplos bytes
 void Write_Data(uint8_t address, uint8_t data);						//escrita de um byte
+void Who_am_I();
 
 
 //Declaração de funções de acesso ao sensor MPU9250
@@ -58,9 +59,10 @@ void SPI2_Init(void)
 	//PB13 como SCK
 	//PB14 como MISO
 	//PB15 como MOSI
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;										//habilita o clock do GPIOB
-	GPIOB->ODR |= 1;															//pino PB0 inicialmente em nível alto
-	GPIOB->MODER |= (0b10 << 30) | (0b10 << 28) | (0b10 << 26) | (0b01 << 24);	//pinos PB13, PB14 e PB15 como função alternativa e PB12 como GPIO
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN|RCC_AHB1ENR_GPIODEN;										//habilita o clock do GPIOB
+	GPIOD->ODR |= 1 << 12;															//pino PB0 inicialmente em nível alto
+	GPIOD->MODER |= (0b10 << 24);
+	GPIOB->MODER |= (0b10 << 30) | (0b10 << 28) | (0b10 << 20);	//pinos PB13, PB14 e PB15 como função alternativa e PB12 como GPIO
 	GPIOB->AFR[1] |= (0b0101 << 28) | (0b0101 << 24) | (0b0101 << 20);			//função alternativa 5 (SPI2)
 
 	//configurando a interface SPI2
@@ -91,20 +93,21 @@ void MPU6500_Config(void)
 	Write_Data(ACCEL_CONFIG, 0b00001000);	//fundo de escala do acelerômetro (±4g)
 	Write_Data(ACCEL_CONFIG2, 0b00000010);	//parâmetros do LPF (Fs=1kHz, accel= 99Hz)
 
-//	Write_Data(PWR_MGMT_1, 0x00);
-//	Write_Data(PWR_MGMT_2, 0b00000111);
-//	Write_Data(ACCEL_CONFIG_2, 0b00000101);
-//	Write_Data(INT_ENABLE, 0x40);
-//	Write_Data(MOT_DETECT_CTRL, 0b11000000);
-//	Write_Data(WOM_THR, 0b01001011); //Sinalizar quando passar de 0.3g
-//	Write_Data(LP_ACCEL_ODR, 0b00001001);
-//	Write_Data(PWR_MGMT_1, 0b00100000);
+	Write_Data(PWR_MGMT_1, 0b00000000);
+	Write_Data(PWR_MGMT_2, 0b00000111);
+	Write_Data(ACCEL_CONFIG_2, 0b00001001);
+	Write_Data(INT_ENABLE, 0x40);
+	Write_Data(MOT_DETECT_CTRL, 0b11000000);
+	Write_Data(WOM_THR, 75); //Sinalizar quando passar de 0.3g
+	Write_Data(LP_ACCEL_ODR, 0b00001001);
+	Write_Data(PWR_MGMT_1, 0b00100000);
+
 }
 
 //leitura de um byte
 uint8_t Read_Data(uint8_t address)
 {
-	GPIOB->ODR &= ~(1 << 12);				//faz o pino CS ir para nível baixo (inicia o comando)
+	GPIOD->ODR &= ~(1 << 12);				//faz o pino CS ir para nível baixo (inicia o comando)
 	while(!(SPI2->SR & SPI_SR_TXE));		//aguarda o buffer Tx estar vazio
 	SPI2->DR = (address | (1<<7));			//envia o endereço com o bit 7 setado
 	while(!(SPI2->SR & SPI_SR_RXNE));		//aguarda o dummy byte do sensor ser recebido
@@ -113,7 +116,7 @@ uint8_t Read_Data(uint8_t address)
 	SPI2->DR = 0xFF;						//envia um dummy byte para o sensor
 	while(!(SPI2->SR & SPI_SR_RXNE));		//aguarda o byte de dado ser recebido
 	uint8_t RX = SPI2->DR;					//lê o byte de dado do sensor
-	GPIOB->ODR |= (1 << 12);				//faz o pino CS ir para nível alto (encerra o comando)
+	GPIOD->ODR |= (1 << 12);				//faz o pino CS ir para nível alto (encerra o comando)
 
 	return RX;								//retorna o byte lido
 }
@@ -170,7 +173,7 @@ void MPU6500_Calibration(void)
 //leitura de múltiplos bytes
 void Read_MData(uint8_t address, uint8_t Nbytes, uint8_t *Data)
 {
-	GPIOB->ODR &= ~(1 << 12);				//faz o pino CS ir para nível baixo (inicia o comando)
+	GPIOD->ODR &= ~(1 << 12);				//faz o pino CS ir para nível baixo (inicia o comando)
 	while(!(SPI2->SR & SPI_SR_TXE));		//aguarda o buffer Tx estar vazio
 	SPI2->DR = (address | (1<<7));			//envia o endereço com o bit 7 setado
 	while(!(SPI2->SR & SPI_SR_RXNE));		//aguarda o dummy byte do sensor ser recebido
@@ -186,13 +189,13 @@ void Read_MData(uint8_t address, uint8_t Nbytes, uint8_t *Data)
 		--Nbytes;
 	}
 
-	GPIOB->ODR |= (1 << 12);				//faz o pino CS ir para nível alto (encerra o comando)
+	GPIOD->ODR |= (1 << 12);				//faz o pino CS ir para nível alto (encerra o comando)
 }
 
 //escrita de um byte
 void Write_Data(uint8_t address, uint8_t data)
 {
-	GPIOB->ODR &= ~(1 << 12);				//faz o pino CS ir para nível baixo (inicia o comando)
+	GPIOD->ODR &= ~(1 << 12);				//faz o pino CS ir para nível baixo (inicia o comando)
 	while(!(SPI2->SR & SPI_SR_TXE));		//aguarda o buffer Tx estar vazio
 	SPI2->DR = (address & ~(1<<7));			//envia o endereço com o bit 7 resetado
 	while(!(SPI2->SR & SPI_SR_RXNE));		//aguarda o dummy byte do sensor ser recebido
@@ -201,9 +204,16 @@ void Write_Data(uint8_t address, uint8_t data)
 	SPI2->DR = data;						//envia o byte de dado para o sensor
 	while(!(SPI2->SR & SPI_SR_RXNE));		//aguarda o byte de dado ser recebido
 	(void)SPI2->DR;							//lê o dummy byte do sensor
-	GPIOB->ODR |= (1 << 12);				//faz o pino CS ir para nível alto (encerra o comando)
+	GPIOD->ODR |= (1 << 12);				//faz o pino CS ir para nível alto (encerra o comando)
 	HAL_Delay(1);							//delay entre escritas
 }
 
+void Who_am_I(){
+
+	uint8_t data;
+	data = Read_Data(WHO_AM_I);
+	printf("%d\n", data);
+
+}
 
 #endif /* MPU6500_SPI_H_ */
