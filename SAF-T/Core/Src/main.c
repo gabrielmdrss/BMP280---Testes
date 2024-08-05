@@ -28,6 +28,8 @@
 #include "math.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include "DEFINES_SAFT.h"
+#include "Utility.h"
 
 /* USER CODE END Includes */
 
@@ -48,8 +50,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi2;
-DMA_HandleTypeDef hdma_spi2_rx;
-DMA_HandleTypeDef hdma_spi2_tx;
 
 UART_HandleTypeDef huart1;
 
@@ -57,30 +57,16 @@ UART_HandleTypeDef huart1;
 int teste = 0;
 int teste2 = 0;
 int contador = 0;
-const float accelScalingFactor = ((float) 4 / 32768);//fator de escala do acelerômetro
-const float gyroScalingFactor = ((float) 500 / 32768);//fator de escala do giroscópio
 
 float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
 			somGyros_z, temp = 0;
-
-const int16_t RAW_ACCEL_X_OFFSET = -128;	//offsets do acelerômetro
-const int16_t RAW_ACCEL_Y_OFFSET = 48;
-const int16_t RAW_ACCEL_Z_OFFSET = 87;
-const int16_t RAW_GYRO_X_OFFSET = 125;	//offsets do giroscópio
-const int16_t RAW_GYRO_Y_OFFSET = -359;
-const int16_t RAW_GYRO_Z_OFFSET = 15;
-
-uint8_t rawData[14];							//valores crus dos sensores
-int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
-int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-int16_t RAW_TEMP;								//valor cru da temperatura
+						//valor cru da temperatura
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_SPI2_Init(void);
 /* USER CODE BEGIN PFP */
@@ -114,12 +100,11 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+  Utility_Init();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_USART1_UART_Init();
   MX_SPI2_Init();
   /* USER CODE BEGIN 2 */
@@ -132,9 +117,24 @@ int main(void)
   	SPI2_Init();		//inicialização da interface SPI2
 
 	printf("\n--------  Exemplo de aplicação de uso MPU-9250 via SPI  --------\n\n");
-	//HAL_Delay(2000);
 
 	MPU6500_Config();
+	MPU6500_Offset_Cancellation();
+
+	  //Configuração do acesso via DMA
+	SPI2->CR2 |= SPI_CR2_TXDMAEN;	//habilita solicitações DMA no TX do SPI2
+	SPI2->CR2 |= SPI_CR2_RXDMAEN;	//habilita solicitações DMA no RX do SPI2
+	DMA1_Config();
+	PB9_Int_Config();
+
+	//Iniciando os acumuladores dos valores do sensor
+	ACC_RAW_ACCEL_X = 0;
+	ACC_RAW_ACCEL_Y = 0;
+	ACC_RAW_ACCEL_Z = 0;
+	ACC_RAW_GYRO_X = 0;
+	ACC_RAW_GYRO_Y = 0;
+	ACC_RAW_GYRO_Z = 0;
+	ACC_RAW_TEMP = 0;
 	//HAL_Delay(1000);
 
 //	SysTick->CTRL = 0;			//desabilita o SysTick
@@ -143,14 +143,82 @@ int main(void)
 //	SysTick->CTRL = 0b011;		//liga o Systick, habilita a interrupção e seleciona a fonte de clock
 
 //	Who_am_I();
+
+
   while (1)
   {
+		if (Sensor_Data_Ready) {
+			//Separação dos valores do sensor do array de dados
+			RAW_ACCEL_X = (((uint16_t) Rx_Data[1] << 8) | (Rx_Data[2]));
+			RAW_ACCEL_Y = (((uint16_t) Rx_Data[3] << 8) | (Rx_Data[4]));
+			RAW_ACCEL_Z = (((uint16_t) Rx_Data[5] << 8) | (Rx_Data[6]));
+			RAW_TEMP = (((int16_t) Rx_Data[7] << 8) | (Rx_Data[8]));
+			RAW_GYRO_X = (((int16_t) Rx_Data[9] << 8) | (Rx_Data[10]));
+			RAW_GYRO_Y = (((int16_t) Rx_Data[11] << 8) | (Rx_Data[12]));
+			RAW_GYRO_Z = (((int16_t) Rx_Data[13] << 8) | (Rx_Data[14]));
+			//Atualização dos acumuladores
+			ACC_RAW_ACCEL_X += RAW_ACCEL_X;
+			ACC_RAW_ACCEL_Y += RAW_ACCEL_Y;
+			ACC_RAW_ACCEL_Z += RAW_ACCEL_Z;
+			ACC_RAW_GYRO_X += RAW_GYRO_X;
+			ACC_RAW_GYRO_Y += RAW_GYRO_Y;
+			ACC_RAW_GYRO_Z += RAW_GYRO_Z;
+			ACC_RAW_TEMP += RAW_TEMP;
 
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_SET);
-//	  HAL_Delay(500);
-//	  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_6, GPIO_PIN_RESET);
+			++sample_counter;
+			if (sample_counter == N_SAMPLES) {
+				//Impressão dos valores lidos do sensor
+				/*printf("Dados do sensor:\n");
+				 printf("ACCEL_X = %.1fg\n", ((float)ACC_RAW_ACCEL_X/N_SAMPLES)*accelScalingFactor);
+				 printf("ACCEL_Y = %.1fg\n", ((float)ACC_RAW_ACCEL_Y/N_SAMPLES)*accelScalingFactor);
+				 printf("ACCEL_Z = %.1fg\n\n", ((float)ACC_RAW_ACCEL_Z/N_SAMPLES)*accelScalingFactor);
 
+				 printf("GYRO_X = %.1f°/s\n", ((float)ACC_RAW_GYRO_X/N_SAMPLES)*gyroScalingFactor);
+				 printf("GYRO_Y = %.1f°/s\n", ((float)ACC_RAW_GYRO_Y/N_SAMPLES)*gyroScalingFactor);
+				 printf("GYRO_Z = %.1f°/s\n\n", ((float)ACC_RAW_GYRO_Z/N_SAMPLES)*gyroScalingFactor);
 
+				 printf("TEMP = %.1f°C\n", ((float)ACC_RAW_TEMP/N_SAMPLES)/333.87 + 21.0);*/
+				ACCEL_X = ((float) ACC_RAW_ACCEL_X / N_SAMPLES)
+						* accelScalingFactor;
+				ACCEL_Y = ((float) ACC_RAW_ACCEL_Y / N_SAMPLES)
+						* accelScalingFactor;
+				ACCEL_Z = ((float) ACC_RAW_ACCEL_Z / N_SAMPLES)
+						* accelScalingFactor;
+
+				GYRO_X = ((float) ACC_RAW_GYRO_X / N_SAMPLES)
+						* gyroScalingFactor;
+				GYRO_Y = ((float) ACC_RAW_GYRO_Y / N_SAMPLES)
+						* gyroScalingFactor;
+				GYRO_Z = ((float) ACC_RAW_GYRO_Z / N_SAMPLES)
+						* gyroScalingFactor;
+				ACCEL = sqrt(
+						ACCEL_X * ACCEL_X + ACCEL_Y * ACCEL_Y
+								+ ACCEL_Z * ACCEL_Z);
+				temperatura = ((float) ACC_RAW_TEMP / N_SAMPLES)
+						/ 333.87 + 21.0;
+				//if((fabs(ACCEL - 1) > LIMITE_ACCEL) || (fabs(GYRO_X) > LIMITE_GYRO) || (fabs(GYRO_Y) > LIMITE_GYRO) || (fabs(GYRO_Z) > LIMITE_GYRO)){
+				if ((fabs(ACCEL - 1) > LIMITE_ACCEL)) {
+					estado_mobilidade = 1;
+					printf("Se mexeu\n");
+				} else {
+					estado_mobilidade = 0;
+					printf("Não se mexeu\n");
+				}
+
+				//Resetando os acumuladores
+				ACC_RAW_ACCEL_X = 0;
+				ACC_RAW_ACCEL_Y = 0;
+				ACC_RAW_ACCEL_Z = 0;
+				ACC_RAW_GYRO_X = 0;
+				ACC_RAW_GYRO_Y = 0;
+				ACC_RAW_GYRO_Z = 0;
+				ACC_RAW_TEMP = 0;
+
+				sample_counter = 0;	//reseta o contador de amostras
+			}
+
+			Sensor_Data_Ready = FALSE;
+		}
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -292,25 +360,6 @@ void USART1_IRQHandler(void) {
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Stream3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
-  /* DMA1_Stream4_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Stream4_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Stream4_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -322,18 +371,12 @@ static void MX_GPIO_Init(void)
 /* USER CODE END MX_GPIO_Init_1 */
 
   /* GPIO Ports Clock Enable */
-  __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
   __HAL_RCC_GPIOD_CLK_ENABLE();
+  __HAL_RCC_GPIOA_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_RESET);
-
-  /*Configure GPIO pin : PA3 */
-  GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /*Configure GPIO pin : PD12 */
   GPIO_InitStruct.Pin = GPIO_PIN_12;
@@ -349,9 +392,6 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
-
   HAL_NVIC_SetPriority(EXTI9_5_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(EXTI9_5_IRQn);
 
@@ -363,9 +403,17 @@ static void MX_GPIO_Init(void)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+	EXTI->PR |= (1 << 9);	//limpa o flag de pendência em EXTI9
 
-	printf("Movimento Detectado\n\n");
-	EXTI->PR |= 1 << 3;
+	DMA1_Stream4->M0AR = (uint32_t) Tx_Data;//ponteiro do buffer dos dados a transmitir
+	DMA1_Stream3->M0AR = (uint32_t) Rx_Data;//ponteiro do buffer dos dados a receber
+
+	DMA1->LIFCR |= 0b111101 << 22;//limpa os flags de interrupção do stream 3 antes de reabilitá-lo
+	DMA1->HIFCR |= 0b111101;//limpa os flags de interrupção do stream 4 antes de reabilitá-lo
+
+	GPIOD->ODR &= ~(1 << 12);//faz o pino CS ir para nível baixo (inicia o comando SPI)
+	DMA1_Stream3->CR |= DMA_SxCR_EN;	//reabilita o stream3 do DMA1 (SPI2_RX)
+	DMA1_Stream4->CR |= DMA_SxCR_EN;	//reabilita o stream4 do DMA1 (SPI2_TX)
 
 }
 
@@ -577,22 +625,6 @@ void mpu_9250_offsets() {
 //	float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
 //			somGyros_z = 0;
 //
-////		offsets do GY-91 MPU-92.50
-////	const int16_t RAW_ACCEL_X_OFFSET = -18;	//offsets do acelerômetro
-////	const int16_t RAW_ACCEL_Y_OFFSET = -127;
-////	const int16_t RAW_ACCEL_Z_OFFSET = -537;
-////	const int16_t RAW_GYRO_X_OFFSET = -10;	//offsets do giroscópio
-////	const int16_t RAW_GYRO_Y_OFFSET = 5;
-////	const int16_t RAW_GYRO_Z_OFFSET = 20;
-//
-////		offsets do MPU-65.00
-//	const int16_t RAW_ACCEL_X_OFFSET = -128;	//offsets do acelerômetro
-//	const int16_t RAW_ACCEL_Y_OFFSET = 48;
-//	const int16_t RAW_ACCEL_Z_OFFSET = 87;
-//	const int16_t RAW_GYRO_X_OFFSET = 125;	//offsets do giroscópio
-//	const int16_t RAW_GYRO_Y_OFFSET = -359;
-//	const int16_t RAW_GYRO_Z_OFFSET = 15;
-//
 //	for (int i = 0; i < 10; i++) {
 //		//leitura e separação dos valores crus dos sensores
 //		Read_MData(0x3B, 14, rawData);
@@ -635,6 +667,61 @@ void mpu_9250_offsets() {
 //
 //	printf("TEMP = %.1f°C\n\n\n\n", (float) RAW_TEMP / 333.87 + 21.0);
 //}
+
+void DMA1_Stream3_IRQHandler(void)
+{
+	DMA1->LIFCR |= 0b111101 << 22;	//limpa as flags de interrupção
+	GPIOD->ODR |= (1 << 12);		//faz o pino CS ir para nível alto (finaliza o comando SPI)
+	Sensor_Data_Ready = TRUE;		//sinaliza que os dados estão prontos para processamento
+}
+
+void DMA1_Config(void)
+{
+	//Configuração do canal 0 do stream 4 do DMA1 (SPI2_TX)
+	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;			//habilita o clock da interface do DMA1
+
+	DMA1_Stream4->PAR = (uint32_t) &(SPI2->DR);	//ponteiro do periférico para onde os dados devem ser transferidos
+	DMA1_Stream4->CR &= ~DMA_SxCR_CHSEL;		//seleciona canal 0
+	DMA1_Stream4->NDTR = 15;					//quantidade de dados a serem transferidos para o periférico
+	DMA1_Stream4->CR |= DMA_SxCR_DIR_0;			//direção da memória para o periférico
+	DMA1_Stream4->CR |= DMA_SxCR_MINC;			//ponteiro da memória pós incrementado automaticamente
+	DMA1_Stream4->CR &= ~DMA_SxCR_PINC;			//ponteiro do periférico fixo
+	DMA1_Stream4->CR &= ~DMA_SxCR_PSIZE;		//tamanho do dado do periférico (8 bits)
+	DMA1_Stream4->CR &= ~DMA_SxCR_MSIZE;		//tamanho do dado na memória (8 bits)
+	DMA1_Stream4->FCR &= ~DMA_SxFCR_DMDIS;		//habilita o modo de transferência direta (sem FIFO)
+
+	//Configuração do canal 0 do stream 3 do DMA1 (SPI2_RX)
+	DMA1_Stream3->PAR = (uint32_t) &(SPI2->DR);	//ponteiro do periférico de onde os dados devem ser transferidos
+	DMA1_Stream3->CR &= ~DMA_SxCR_CHSEL;		//seleciona canal 0
+	DMA1_Stream3->NDTR = 15;					//quantidade de dados a serem transferidos para a memória
+	DMA1_Stream3->CR &= ~DMA_SxCR_DIR;			//direção do periférico para a memória
+	DMA1_Stream3->CR |= DMA_SxCR_MINC;			//ponteiro da memória pós incrementado automaticamente
+	DMA1_Stream3->CR &= ~DMA_SxCR_PINC;			//ponteiro do periférico fixo
+	DMA1_Stream3->CR &= ~DMA_SxCR_PSIZE;		//tamanho do dado do periférico (8 bits)
+	DMA1_Stream3->CR &= ~DMA_SxCR_MSIZE;		//tamanho do dado na memória (8 bits)
+	DMA1_Stream3->FCR &= ~DMA_SxFCR_DMDIS;		//habilita o modo de transferência direta (sem FIFO)
+
+	DMA1_Stream3->CR |= DMA_SxCR_TCIE;			//habilita a interrupção de transferência completa do Stream3 do DMA1
+	//NVIC_EnableIRQ(DMA1_Stream3_IRQn);			//habilita a interrupção no NVIC
+	HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
+	HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
+}
+
+void PB9_Int_Config(void)
+{
+	//Configuração do pino PB9 como entrada digital com resistor de pull-down
+	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;	//habilita o clock do GPIOB
+	GPIOB->MODER &= ~(0b11 << 18);			//seleciona modo de entrada digital no pino PB9
+	GPIOB->PUPDR |= 0b10 << 18;				//habilita o resistor de pull-down no pino PB9
+
+	//Configuração da EXTI9 para receber pulsos externos em PB9
+	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;	//habilita o clock de SYSCFG
+	SYSCFG->EXTICR[2] |= 0b0001 << 4;		//seleciona PB9 como gatilho de EXTI9
+	EXTI->RTSR |= 1 << 9;			 		//habilita a detecção por borda de subida em PB9
+	EXTI->IMR |= 1 << 9;				 	//habilita a interrupção EXTI9 no controlador EXTI
+	NVIC_EnableIRQ(EXTI9_5_IRQn);			//habilita a interrupção EXTI9 no NVIC
+}
+
 
 
 /* USER CODE END 4 */
