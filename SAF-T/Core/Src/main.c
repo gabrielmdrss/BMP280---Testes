@@ -156,66 +156,50 @@ int main(void)
 			RAW_GYRO_X = (((int16_t) Rx_Data[9] << 8) | (Rx_Data[10]));
 			RAW_GYRO_Y = (((int16_t) Rx_Data[11] << 8) | (Rx_Data[12]));
 			RAW_GYRO_Z = (((int16_t) Rx_Data[13] << 8) | (Rx_Data[14]));
-			//Atualização dos acumuladores
-			ACC_RAW_ACCEL_X += RAW_ACCEL_X;
-			ACC_RAW_ACCEL_Y += RAW_ACCEL_Y;
-			ACC_RAW_ACCEL_Z += RAW_ACCEL_Z;
-			ACC_RAW_GYRO_X += RAW_GYRO_X;
-			ACC_RAW_GYRO_Y += RAW_GYRO_Y;
-			ACC_RAW_GYRO_Z += RAW_GYRO_Z;
-			ACC_RAW_TEMP += RAW_TEMP;
 
-			++sample_counter;
-			if (sample_counter == N_SAMPLES) {
-				//Impressão dos valores lidos do sensor
-				/*printf("Dados do sensor:\n");
-				 printf("ACCEL_X = %.1fg\n", ((float)ACC_RAW_ACCEL_X/N_SAMPLES)*accelScalingFactor);
-				 printf("ACCEL_Y = %.1fg\n", ((float)ACC_RAW_ACCEL_Y/N_SAMPLES)*accelScalingFactor);
-				 printf("ACCEL_Z = %.1fg\n\n", ((float)ACC_RAW_ACCEL_Z/N_SAMPLES)*accelScalingFactor);
 
-				 printf("GYRO_X = %.1f°/s\n", ((float)ACC_RAW_GYRO_X/N_SAMPLES)*gyroScalingFactor);
-				 printf("GYRO_Y = %.1f°/s\n", ((float)ACC_RAW_GYRO_Y/N_SAMPLES)*gyroScalingFactor);
-				 printf("GYRO_Z = %.1f°/s\n\n", ((float)ACC_RAW_GYRO_Z/N_SAMPLES)*gyroScalingFactor);
+			ACCEL_X = ((float) RAW_ACCEL_X)
+					* accelScalingFactor;
+			ACCEL_Y = ((float) RAW_ACCEL_Y)
+					* accelScalingFactor;
+			ACCEL_Z = ((float) RAW_ACCEL_Z)
+					* accelScalingFactor;
 
-				 printf("TEMP = %.1f°C\n", ((float)ACC_RAW_TEMP/N_SAMPLES)/333.87 + 21.0);*/
-				ACCEL_X = ((float) ACC_RAW_ACCEL_X / N_SAMPLES)
-						* accelScalingFactor;
-				ACCEL_Y = ((float) ACC_RAW_ACCEL_Y / N_SAMPLES)
-						* accelScalingFactor;
-				ACCEL_Z = ((float) ACC_RAW_ACCEL_Z / N_SAMPLES)
-						* accelScalingFactor;
+			GYRO_X = ((float) RAW_GYRO_X)
+					* gyroScalingFactor;
+			GYRO_Y = ((float) RAW_GYRO_Y)
+					* gyroScalingFactor;
+			GYRO_Z = ((float) RAW_GYRO_Z)
+					* gyroScalingFactor;
 
-				GYRO_X = ((float) ACC_RAW_GYRO_X / N_SAMPLES)
-						* gyroScalingFactor;
-				GYRO_Y = ((float) ACC_RAW_GYRO_Y / N_SAMPLES)
-						* gyroScalingFactor;
-				GYRO_Z = ((float) ACC_RAW_GYRO_Z / N_SAMPLES)
-						* gyroScalingFactor;
-				ACCEL = sqrt(
-						ACCEL_X * ACCEL_X + ACCEL_Y * ACCEL_Y
-								+ ACCEL_Z * ACCEL_Z);
-				temperatura = ((float) ACC_RAW_TEMP / N_SAMPLES)
-						/ 333.87 + 21.0;
-				//if((fabs(ACCEL - 1) > LIMITE_ACCEL) || (fabs(GYRO_X) > LIMITE_GYRO) || (fabs(GYRO_Y) > LIMITE_GYRO) || (fabs(GYRO_Z) > LIMITE_GYRO)){
-				if ((fabs(ACCEL - 1) > LIMITE_ACCEL)) {
-					estado_mobilidade = 1;
-					printf("Se mexeu\n");
-				} else {
-					estado_mobilidade = 0;
-					printf("Não se mexeu\n");
-				}
+			temperatura = ((float) ACC_RAW_TEMP) / 333.87 + 21.0;
 
-				//Resetando os acumuladores
-				ACC_RAW_ACCEL_X = 0;
-				ACC_RAW_ACCEL_Y = 0;
-				ACC_RAW_ACCEL_Z = 0;
-				ACC_RAW_GYRO_X = 0;
-				ACC_RAW_GYRO_Y = 0;
-				ACC_RAW_GYRO_Z = 0;
-				ACC_RAW_TEMP = 0;
+			ACCEL_X_FILTERED = passa_alta_butterworth(ACCEL_X, x_x, y_x);
+			ACCEL_Y_FILTERED = passa_alta_butterworth(ACCEL_Y, x_y, y_y);
+			ACCEL_Z_FILTERED = passa_alta_butterworth(ACCEL_Z, x_z, y_z);
 
-				sample_counter = 0;	//reseta o contador de amostras
-			}
+			//Impressão dos valores lidos do sensor
+			printf("Dados do sensor:\n");
+			printf("ACCEL_X = %.1fg\n", ACCEL_X_FILTERED);
+			printf("ACCEL_Y = %.1fg\n", ACCEL_Y_FILTERED);
+			printf("ACCEL_Z = %.1fg\n\n", ACCEL_Z_FILTERED);
+
+			printf("GYRO_X = %.1f°/s\n", GYRO_X);
+			printf("GYRO_Y = %.1f°/s\n", GYRO_Y);
+			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
+
+			printf("TEMP = %.1f°C\n\n\n", temperatura);
+
+			//Resetando os acumuladores
+			ACCEL_X = 0;
+			ACCEL_Y = 0;
+			ACCEL_Z = 0;
+			ACCEL_X_FILTERED = 0;
+			ACCEL_Y_FILTERED = 0;
+			ACCEL_Z_FILTERED = 0;
+			RAW_ACCEL_X = 0;
+			RAW_ACCEL_Y = 0;
+			RAW_ACCEL_Z = 0;
 
 			Sensor_Data_Ready = FALSE;
 		}
@@ -722,7 +706,28 @@ void PB9_Int_Config(void)
 	NVIC_EnableIRQ(EXTI9_5_IRQn);			//habilita a interrupção EXTI9 no NVIC
 }
 
+float passa_alta_butterworth(float new_input, float *x, float *y) {
+    for (int i = 0; i < 4; i++) {			//Atualizar a lista de entradas
+        x[i] = x[i+1];
+    }
 
+    x[0] = new_input;						//Ultima amostra obtida
+
+    float new_output = b[0]*x[0] + b[1]*x[1] + b[2]*x[2] + b[3]*x[3] + b[4]*x[4]
+                       - a[0]*y[0] - a[1]*y[1] - a[2]*y[2] - a[3]*y[3];
+
+    for (int i = 0; i < 3; i++) {			// Atualizar a lista de saídas
+    	printf("oi\n");
+    	HAL_Delay(1000);
+        y[i] = y[i+1];
+    }
+
+    printf("%.1f",y[2]);
+
+    y[0] = new_output;						//Ultima saída mensurada
+
+    return new_output;
+}
 
 /* USER CODE END 4 */
 
