@@ -127,14 +127,14 @@ int main(void)
 	DMA1_Config();
 	PB9_Int_Config();
 
-	//Iniciando os acumuladores dos valores do sensor
-	ACC_RAW_ACCEL_X = 0;
-	ACC_RAW_ACCEL_Y = 0;
-	ACC_RAW_ACCEL_Z = 0;
-	ACC_RAW_GYRO_X = 0;
-	ACC_RAW_GYRO_Y = 0;
-	ACC_RAW_GYRO_Z = 0;
-	ACC_RAW_TEMP = 0;
+	//Iniciando as váriaveis dos valores do sensor
+	ACCEL_X = 0;
+	ACCEL_Y = 0;
+	ACCEL_Z = 0;
+	GYRO_X = 0;
+	GYRO_Y = 0;
+	GYRO_Z = 0;
+
 	//HAL_Delay(1000);
 
 //	SysTick->CTRL = 0;			//desabilita o SysTick
@@ -174,9 +174,9 @@ int main(void)
 
 			temperatura = ((float) ACC_RAW_TEMP) / 333.87 + 21.0;
 
-			ACCEL_X_FILTERED = passa_alta_butterworth(ACCEL_X, x_x, y_x);
-			ACCEL_Y_FILTERED = passa_alta_butterworth(ACCEL_Y, x_y, y_y);
-			ACCEL_Z_FILTERED = passa_alta_butterworth(ACCEL_Z, x_z, y_z);
+			ACCEL_X_FILTERED = passa_alta_butterworth(ACCEL_X, amostras_x, saidas_x);
+			ACCEL_Y_FILTERED = passa_alta_butterworth(ACCEL_Y, amostras_y, saidas_y);
+			ACCEL_Z_FILTERED = passa_alta_butterworth(ACCEL_Z, amostras_z, saidas_z);
 
 			//Impressão dos valores lidos do sensor
 			printf("Dados do sensor:\n");
@@ -708,21 +708,19 @@ void PB9_Int_Config(void)
 
 float passa_alta_butterworth(float new_input, float *x, float *y) {
     for (int i = 0; i < 4; i++) {			//Atualizar a lista de entradas
-        x[i] = x[i+1];
+        x[4-i] = x[3-i];
     }
 
     x[0] = new_input;						//Ultima amostra obtida
 
-    float new_output = b[0]*x[0] + b[1]*x[1] + b[2]*x[2] + b[3]*x[3] + b[4]*x[4]
-                       - a[0]*y[0] - a[1]*y[1] - a[2]*y[2] - a[3]*y[3];
 
-    for (int i = 0; i < 3; i++) {			// Atualizar a lista de saídas
-    	printf("oi\n");
-    	HAL_Delay(1000);
-        y[i] = y[i+1];
+    float new_output = b[0]*x[0] + b[1]*x[1] + b[2]*x[2] + b[3]*x[3] + b[4]*x[4]
+                       - a[0]*y[1] - a[1]*y[2] - a[2]*y[3] - a[3]*y[4];
+
+    for (int i = 0; i < 4; i++) {			// Atualizar a lista de saídas
+        y[4-i] = y[3-i];
     }
 
-    printf("%.1f",y[2]);
 
     y[0] = new_output;						//Ultima saída mensurada
 
