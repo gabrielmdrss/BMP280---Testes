@@ -171,32 +171,32 @@ int main(void)
 					* gyroScalingFactor;
 			GYRO_Z = ((float) RAW_GYRO_Z)
 					* gyroScalingFactor;
+			ACCEL = sqrt(ACCEL_X*ACCEL_X + ACCEL_Y*ACCEL_Y + ACCEL_Z*ACCEL_Z);
 
 			temperatura = ((float) ACC_RAW_TEMP) / 333.87 + 21.0;
 
-			ACCEL_X_FILTERED = passa_alta_butterworth(ACCEL_X, amostras_x, saidas_x);
-			ACCEL_Y_FILTERED = passa_alta_butterworth(ACCEL_Y, amostras_y, saidas_y);
-			ACCEL_Z_FILTERED = passa_alta_butterworth(ACCEL_Z, amostras_z, saidas_z);
+			//g = 0.9 * g + 0.1 * ACCEL;
+			//ACCEL = ACCEL - g;
+
+
+			ACCEL_FILTERED = passa_alta_butterworth(ACCEL, amostras, saidas);
 
 			//Impressão dos valores lidos do sensor
-			printf("Dados do sensor:\n");
-			printf("ACCEL_X = %.1fg\n", ACCEL_X_FILTERED);
-			printf("ACCEL_Y = %.1fg\n", ACCEL_Y_FILTERED);
-			printf("ACCEL_Z = %.1fg\n\n", ACCEL_Z_FILTERED);
 
-			printf("GYRO_X = %.1f°/s\n", GYRO_X);
-			printf("GYRO_Y = %.1f°/s\n", GYRO_Y);
-			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
+			printf("%.2f\n", ACCEL_FILTERED);
 
-			printf("TEMP = %.1f°C\n\n\n", temperatura);
+//			printf("Dados do sensor:\n");
+//			printf("ACCEL = %.1fg\n\n", ACCEL_FILTERED);
+//			printf("GYRO_X = %.1f°/s\n", GYRO_X);
+//			printf("GYRO_Y = %.1f°/s\n", GYRO_Y);
+//			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
+//
+//			printf("TEMP = %.1f°C\n\n\n", temperatura);
 
 			//Resetando os acumuladores
 			ACCEL_X = 0;
 			ACCEL_Y = 0;
 			ACCEL_Z = 0;
-			ACCEL_X_FILTERED = 0;
-			ACCEL_Y_FILTERED = 0;
-			ACCEL_Z_FILTERED = 0;
 			RAW_ACCEL_X = 0;
 			RAW_ACCEL_Y = 0;
 			RAW_ACCEL_Z = 0;
@@ -707,24 +707,24 @@ void PB9_Int_Config(void)
 }
 
 float passa_alta_butterworth(float new_input, float *x, float *y) {
+
+//    //atualizando as amostras de entrada
     for (int i = 0; i < 4; i++) {			//Atualizar a lista de entradas
-        x[4-i] = x[3-i];
-    }
+           x[4-i] = x[3-i];
+       }
 
     x[0] = new_input;						//Ultima amostra obtida
 
+    y[0] = b[0]*x[0] + b[1]*x[1] + b[2]*x[2] + b[3]*x[3] + b[4]*x[4]
 
-    float new_output = b[0]*x[0] + b[1]*x[1] + b[2]*x[2] + b[3]*x[3] + b[4]*x[4]
-                       - a[0]*y[1] - a[1]*y[2] - a[2]*y[3] - a[3]*y[4];
+    		 - a[1]*y[1] - a[2]*y[2] - a[3]*y[3] - a[4]*y[4];
 
+    //    //atualizando as amostras de saída
     for (int i = 0; i < 4; i++) {			// Atualizar a lista de saídas
         y[4-i] = y[3-i];
     }
 
-
-    y[0] = new_output;						//Ultima saída mensurada
-
-    return new_output;
+    return y[0];
 }
 
 /* USER CODE END 4 */
