@@ -171,27 +171,37 @@ int main(void)
 					* gyroScalingFactor;
 			GYRO_Z = ((float) RAW_GYRO_Z)
 					* gyroScalingFactor;
-			ACCEL = sqrt(ACCEL_X*ACCEL_X + ACCEL_Y*ACCEL_Y + ACCEL_Z*ACCEL_Z);
 
 			temperatura = ((float) ACC_RAW_TEMP) / 333.87 + 21.0;
+//		    filtro_complementar = 9.98 * (ultimo_filtro + GYRO_X * 0.01) + (1 - 0.02) * ACCEL_X;
 
-			//g = 0.9 * g + 0.1 * ACCEL;
-			//ACCEL = ACCEL - g;
+			ACCEL_MAG = sqrt(ACCEL_X*ACCEL_X + ACCEL_Y*ACCEL_Y + ACCEL_Z*ACCEL_Z);
 
+			ACCEL_FILTERED = passa_alta_butterworth(ACCEL_MAG, amostras, saidas);
+			stationary = (ACCEL_MAG < 0.1) ? 1 : 0;
 
-			ACCEL_FILTERED = passa_alta_butterworth(ACCEL, amostras, saidas);
-
-			//Impressão dos valores lidos do sensor
-
-			printf("%.2f\n", ACCEL_FILTERED);
+//			printf("%.2f\n", ACCEL_FILTERED);
 
 //			printf("Dados do sensor:\n");
-//			printf("ACCEL = %.1fg\n\n", ACCEL_FILTERED);
-//			printf("GYRO_X = %.1f°/s\n", GYRO_X);
+//			printf("%.1f, %.1f\n", GYRO_X, filtro_complementar);
+//			printf("ACCEL = %.3fg\n\n", ACCEL_FILTERED);
+//			printf("GYRO_X = %.1f°/s\n", filtro_complementar);
 //			printf("GYRO_Y = %.1f°/s\n", GYRO_Y);
 //			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
-//
 //			printf("TEMP = %.1f°C\n\n\n", temperatura);
+
+			ACCEL_X = (int)(ACCEL_X * 100 + 0.5) / 100.0;
+
+			if(stationary)
+				VELOC_FILTERED = 0;
+			else
+				VELOC_FILTERED += ((ACCEL_X*9.81) * sampleperiod) * 3,6;
+
+			POS_FILTERED += VELOC_FILTERED * sampleperiod;
+
+//			printf("ACCEL = %.1fg\n", ACCEL_FILTERED);
+//			printf("VELOC = %.1f\n", VELOC_FILTERED);
+			printf("POS = %.1fm\n\n", POS_FILTERED);
 
 			//Resetando os acumuladores
 			ACCEL_X = 0;
@@ -201,7 +211,15 @@ int main(void)
 			RAW_ACCEL_Y = 0;
 			RAW_ACCEL_Z = 0;
 
+			if(cont >= 500){
+				POS_FILTERED = 0;
+				VELOC_FILTERED = 0;
+				cont = 0;
+			}
+
+			cont++;
 			Sensor_Data_Ready = FALSE;
+
 		}
     /* USER CODE END WHILE */
 
