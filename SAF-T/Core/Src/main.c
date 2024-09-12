@@ -18,6 +18,7 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "Fusion/Fusion.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -28,6 +29,7 @@
 #include "math.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 #include "DEFINES_SAFT.h"
 #include "Utility.h"
 
@@ -135,18 +137,32 @@ int main(void)
 	GYRO_Y = 0;
 	GYRO_Z = 0;
 
-	//HAL_Delay(1000);
+	const FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+	const FusionVector gyroscopeSensitivity = {1.0f, 1.0f, 1.0f};
+	const FusionVector gyroscopeOffset = {0.0f, 0.0f, 0.0f};
+	const FusionMatrix accelerometerMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+	const FusionVector accelerometerSensitivity = {1.0f, 1.0f, 1.0f};
+	const FusionVector accelerometerOffset = {0.0f, 0.0f, 0.0f};
 
-//	SysTick->CTRL = 0;			//desabilita o SysTick
-//	SysTick->LOAD = 2.1e5;		//carrega o registrador Reload Value (interrupções a cada 500ms)
-//	SysTick->VAL = 0;			//reinicia a contagem do contador
-//	SysTick->CTRL = 0b011;		//liga o Systick, habilita a interrupção e seleciona a fonte de clock
+	FusionOffset offset;
+	FusionAhrs ahrs;
 
-//	Who_am_I();
+	FusionOffsetInitialise(&offset, SAMPLE_RATE);
+	FusionAhrsInitialise(&ahrs);
+
+	const FusionAhrsSettings settings = {
+			.convention = FusionConventionNwu,
+			.gain = 0.5f,
+			.gyroscopeRange = 250.0f,
+			.accelerationRejection = 2.5f,
+			.magneticRejection = 10.0f,
+			.recoveryTriggerPeriod = 5 * SAMPLE_RATE,
+	};
+	FusionAhrsSetSettings(&ahrs, &settings);
 
 
-  while (1)
-  {
+  while (1) {
+
 		if (Sensor_Data_Ready) {
 			//Separação dos valores do sensor do array de dados
 			RAW_ACCEL_X = (((uint16_t) Rx_Data[1] << 8) | (Rx_Data[2]));
@@ -157,31 +173,23 @@ int main(void)
 			RAW_GYRO_Y = (((int16_t) Rx_Data[11] << 8) | (Rx_Data[12]));
 			RAW_GYRO_Z = (((int16_t) Rx_Data[13] << 8) | (Rx_Data[14]));
 
+			ACCEL_X = ((float) RAW_ACCEL_X) * accelScalingFactor;
+			ACCEL_Y = ((float) RAW_ACCEL_Y) * accelScalingFactor;
+			ACCEL_Z = ((float) RAW_ACCEL_Z) * accelScalingFactor;
 
-			ACCEL_X = ((float) RAW_ACCEL_X)
-					* accelScalingFactor;
-			ACCEL_Y = ((float) RAW_ACCEL_Y)
-					* accelScalingFactor;
-			ACCEL_Z = ((float) RAW_ACCEL_Z)
-					* accelScalingFactor;
-
-			GYRO_X = ((float) RAW_GYRO_X)
-					* gyroScalingFactor;
-			GYRO_Y = ((float) RAW_GYRO_Y)
-					* gyroScalingFactor;
-			GYRO_Z = ((float) RAW_GYRO_Z)
-					* gyroScalingFactor;
+			GYRO_X = ((float) RAW_GYRO_X) * gyroScalingFactor;
+			GYRO_Y = ((float) RAW_GYRO_Y) * gyroScalingFactor;
+			GYRO_Z = ((float) RAW_GYRO_Z) * gyroScalingFactor;
 
 			temperatura = ((float) ACC_RAW_TEMP) / 333.87 + 21.0;
 //		    filtro_complementar = 9.98 * (ultimo_filtro + GYRO_X * 0.01) + (1 - 0.02) * ACCEL_X;
-
-			ACCEL_MAG = sqrt(ACCEL_X*ACCEL_X + ACCEL_Y*ACCEL_Y + ACCEL_Z*ACCEL_Z);
-
-			ACCEL_FILTERED = passa_alta_butterworth(ACCEL_MAG, amostras, saidas);
-			stationary = (ACCEL_MAG < 0.1) ? 1 : 0;
+//			ACCEL_MAG = sqrt(
+//					ACCEL_X * ACCEL_X + ACCEL_Y * ACCEL_Y + ACCEL_Z * ACCEL_Z);
+//
+//			ACCEL_FILTERED = passa_alta_butterworth(ACCEL_MAG, amostras,
+//					saidas);
 
 //			printf("%.2f\n", ACCEL_FILTERED);
-
 //			printf("Dados do sensor:\n");
 //			printf("%.1f, %.1f\n", GYRO_X, filtro_complementar);
 //			printf("ACCEL = %.3fg\n\n", ACCEL_FILTERED);
@@ -190,18 +198,52 @@ int main(void)
 //			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
 //			printf("TEMP = %.1f°C\n\n\n", temperatura);
 
-			ACCEL_X = (int)(ACCEL_X * 100 + 0.5) / 100.0;
+			ACCEL_FILTERED_X = passa_alta_butterworth(ACCEL_X, amostras_x,
+					saidas_x);
+			ACCEL_FILTERED_Y = passa_alta_butterworth(ACCEL_Y, amostras_y,
+					saidas_y);
+			ACCEL_FILTERED_Z = passa_alta_butterworth(ACCEL_Z, amostras_z,
+					saidas_z);
+			ACCEL_MAG = sqrt(ACCEL_X*ACCEL_X + ACCEL_Y*ACCEL_Y + ACCEL_Z*ACCEL_Z);
+			stationary = (ACCEL_MAG < 0.1) ? 1 : 0;
 
-			if(stationary)
-				VELOC_FILTERED = 0;
-			else
-				VELOC_FILTERED += ((ACCEL_X*9.81) * sampleperiod) * 3,6;
+			// Pegar última amostra
+			const clock_t timestamp = clock();
+			FusionVector gyroscope = { GYRO_X, GYRO_Y, GYRO_Z };
+			//FusionVector accelerometer = { ACCEL_FILTERED_X, ACCEL_FILTERED_Y, ACCEL_FILTERED_Z };
+			FusionVector accelerometer = { ACCEL_X, ACCEL_Y, ACCEL_Z };
 
-			POS_FILTERED += VELOC_FILTERED * sampleperiod;
+			// Calibração
+	        gyroscope = FusionCalibrationInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
+	        accelerometer = FusionCalibrationInertial(accelerometer, accelerometerMisalignment, accelerometerSensitivity, accelerometerOffset);
 
-//			printf("ACCEL = %.1fg\n", ACCEL_FILTERED);
-//			printf("VELOC = %.1f\n", VELOC_FILTERED);
-			printf("POS = %.1fm\n\n", POS_FILTERED);
+	        // Algoritmo de correção de Offset
+	        gyroscope = FusionOffsetUpdate(&offset, gyroscope);
+
+	        // Calcular delta T (em segundos) para contabilizar no possível erro de clock
+			static clock_t previousTimestamp;
+			const float deltaTime = (float) (timestamp - previousTimestamp)/ (float) CLOCKS_PER_SEC;
+			previousTimestamp = timestamp;
+
+	        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 0.01f);
+			const FusionVector linearAcceleration = FusionAhrsGetLinearAcceleration(&ahrs);
+			const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+
+
+			printf("ACCEL_X = %.1fg\n", linearAcceleration.axis.x);
+			printf("ACCEL_Y = %.1fg\n", linearAcceleration.axis.y);
+			printf("ACCEL_Z = %.1fg\n\n", linearAcceleration.axis.z);
+
+//			ACCEL_Y = (int)(linearAcceleration.axis.y * 100 + 0.5) / 100.0;
+//			if(stationary){
+//				VELOC_FILTERED = 0;
+//			}
+//			else{
+//				VELOC_FILTERED += ((ACCEL_Y*9.81) * sampleperiod) * 3,6;
+//			}
+//			POS_FILTERED += VELOC_FILTERED * sampleperiod;
+//
+//			printf("POS = %.1fm\n\n", POS_FILTERED);
 
 			//Resetando os acumuladores
 			ACCEL_X = 0;
@@ -210,21 +252,19 @@ int main(void)
 			RAW_ACCEL_X = 0;
 			RAW_ACCEL_Y = 0;
 			RAW_ACCEL_Z = 0;
-
-			if(cont >= 500){
-				POS_FILTERED = 0;
-				VELOC_FILTERED = 0;
-				cont = 0;
-			}
-
-			cont++;
 			Sensor_Data_Ready = FALSE;
+			contador++;
+
+//			if(contador == 500){
+//				POS_FILTERED = 0;
+//				VELOC_FILTERED = 0;
+//			}
 
 		}
-    /* USER CODE END WHILE */
+		/* USER CODE END WHILE */
 
-    /* USER CODE BEGIN 3 */
-  }
+		/* USER CODE BEGIN 3 */
+	}
   /* USER CODE END 3 */
 }
 
