@@ -35,8 +35,18 @@ float passa_alta_butterworth(float new_input, float *x, float *y);
 float ACCEL_MAG;
 float accel_Debug=0;
 
+float RateRoll, RatePitch, RateYaw;
+float RateCalibrationRoll, RateCalibrationPitch, RateCalibrationYaw;
+int RateCalibrationNumber;
+uint32_t LoopTimer;
+float AngleRoll, AnglePitch;
+float KalmanAngleRoll = 0, KalmanUncertaintyAngleRoll = 2*2;
+float KalmanAnglePitch=0, KalmanUncertaintyAnglePitch = 2*2;
+float Kalman1DOutput[] = {0,0};
+
 uint8_t Rx_Data[15];	//array para recebimento dos dados do sensor
 uint8_t Sensor_Data_Ready = FALSE;				//flag que indica o estado dos dados do sensor após o DMA
+uint8_t Sensor_Print = FALSE;				//flag que indica o estado dos dados do sensor após o DMA
 int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;	//valores crus do acelerômetro
 int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
 int16_t RAW_TEMP;								//valor cru da temperatura
@@ -44,7 +54,6 @@ int32_t ACC_RAW_TEMP;										//valores acumulados da temperatura
 uint8_t sample_counter = 0;	//contador de amostras acumuladas para cálculo da média de leituras do sensor
 float ACCEL_X, ACCEL_Y, ACCEL_Z, GYRO_X, GYRO_Y, GYRO_Z, temperatura;
 float ACCEL_FILTERED_X, ACCEL_FILTERED_Y, ACCEL_FILTERED_Z;
-float stationary;
 //float ULTIMA_ACCEL_FILT;
 float VELOC_FILTERED = 0;
 float ULTIMA_VELOC_FILT;

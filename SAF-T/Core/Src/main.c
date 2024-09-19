@@ -58,10 +58,7 @@ UART_HandleTypeDef huart1;
 /* USER CODE BEGIN PV */
 int teste = 0;
 int teste2 = 0;
-int contador = 0;
 
-float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
-			somGyros_z, temp = 0;
 						//valor cru da temperatura
 
 /* USER CODE END PV */
@@ -137,57 +134,9 @@ int main(void)
 	GYRO_Y = 0;
 	GYRO_Z = 0;
 
-	const FusionMatrix gyroscopeMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-	const FusionVector gyroscopeSensitivity = {1.0f, 1.0f, 1.0f};
-	const FusionVector gyroscopeOffset = {0.0f, 0.0f, 0.0f};
-	const FusionMatrix accelerometerMisalignment = {1.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 1.0f};
-	const FusionVector accelerometerSensitivity = {1.0f, 1.0f, 1.0f};
-	const FusionVector accelerometerOffset = {0.0f, 0.0f, 0.0f};
-
-	FusionOffset offset;
-	FusionAhrs ahrs;
-
-	FusionOffsetInitialise(&offset, SAMPLE_RATE);
-	FusionAhrsInitialise(&ahrs);
-
-	const FusionAhrsSettings settings = {
-			.convention = FusionConventionNwu,
-			.gain = 0.5f,
-			.gyroscopeRange = 250.0f,
-			.accelerationRejection = 2.5f,
-			.magneticRejection = 10.0f,
-			.recoveryTriggerPeriod = 5 * SAMPLE_RATE,
-	};
-	FusionAhrsSetSettings(&ahrs, &settings);
-
-
   while (1) {
 
 		if (Sensor_Data_Ready) {
-			//Separação dos valores do sensor do array de dados
-			RAW_ACCEL_X = (((uint16_t) Rx_Data[1] << 8) | (Rx_Data[2]));
-			RAW_ACCEL_Y = (((uint16_t) Rx_Data[3] << 8) | (Rx_Data[4]));
-			RAW_ACCEL_Z = (((uint16_t) Rx_Data[5] << 8) | (Rx_Data[6]));
-			RAW_TEMP = (((int16_t) Rx_Data[7] << 8) | (Rx_Data[8]));
-			RAW_GYRO_X = (((int16_t) Rx_Data[9] << 8) | (Rx_Data[10]));
-			RAW_GYRO_Y = (((int16_t) Rx_Data[11] << 8) | (Rx_Data[12]));
-			RAW_GYRO_Z = (((int16_t) Rx_Data[13] << 8) | (Rx_Data[14]));
-
-			ACCEL_X = ((float) RAW_ACCEL_X) * accelScalingFactor;
-			ACCEL_Y = ((float) RAW_ACCEL_Y) * accelScalingFactor;
-			ACCEL_Z = ((float) RAW_ACCEL_Z) * accelScalingFactor;
-
-			GYRO_X = ((float) RAW_GYRO_X) * gyroScalingFactor;
-			GYRO_Y = ((float) RAW_GYRO_Y) * gyroScalingFactor;
-			GYRO_Z = ((float) RAW_GYRO_Z) * gyroScalingFactor;
-
-			temperatura = ((float) ACC_RAW_TEMP) / 333.87 + 21.0;
-//		    filtro_complementar = 9.98 * (ultimo_filtro + GYRO_X * 0.01) + (1 - 0.02) * ACCEL_X;
-//			ACCEL_MAG = sqrt(
-//					ACCEL_X * ACCEL_X + ACCEL_Y * ACCEL_Y + ACCEL_Z * ACCEL_Z);
-//
-//			ACCEL_FILTERED = passa_alta_butterworth(ACCEL_MAG, amostras,
-//					saidas);
 
 //			printf("%.2f\n", ACCEL_FILTERED);
 //			printf("Dados do sensor:\n");
@@ -198,52 +147,23 @@ int main(void)
 //			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
 //			printf("TEMP = %.1f°C\n\n\n", temperatura);
 
-			ACCEL_FILTERED_X = passa_alta_butterworth(ACCEL_X, amostras_x,
-					saidas_x);
-			ACCEL_FILTERED_Y = passa_alta_butterworth(ACCEL_Y, amostras_y,
-					saidas_y);
-			ACCEL_FILTERED_Z = passa_alta_butterworth(ACCEL_Z, amostras_z,
-					saidas_z);
-			ACCEL_MAG = sqrt(ACCEL_X*ACCEL_X + ACCEL_Y*ACCEL_Y + ACCEL_Z*ACCEL_Z);
-			stationary = (ACCEL_MAG < 0.1) ? 1 : 0;
+			gyro_signals();
+			//RateRoll -= RateCalibrationRoll;
+		    //RatePitch -= RateCalibrationPitch;
+		    //RateYaw -= RateCalibrationYaw;
 
-			// Pegar última amostra
-			const clock_t timestamp = clock();
-			FusionVector gyroscope = { GYRO_X, GYRO_Y, GYRO_Z };
-			//FusionVector accelerometer = { ACCEL_FILTERED_X, ACCEL_FILTERED_Y, ACCEL_FILTERED_Z };
-			FusionVector accelerometer = { ACCEL_X, ACCEL_Y, ACCEL_Z };
+		    kalman_1d(&KalmanAngleRoll, &KalmanUncertaintyAngleRoll, &RateRoll, &AngleRoll);
+			KalmanAngleRoll = Kalman1DOutput[0];
+			KalmanUncertaintyAngleRoll = Kalman1DOutput[1];
+			kalman_1d(&KalmanAnglePitch, &KalmanUncertaintyAnglePitch, &RatePitch, &AnglePitch);
+			KalmanAnglePitch = Kalman1DOutput[0];
+			KalmanUncertaintyAnglePitch = Kalman1DOutput[1];
 
-			// Calibração
-	        gyroscope = FusionCalibrationInertial(gyroscope, gyroscopeMisalignment, gyroscopeSensitivity, gyroscopeOffset);
-	        accelerometer = FusionCalibrationInertial(accelerometer, accelerometerMisalignment, accelerometerSensitivity, accelerometerOffset);
+			printf("ROLL = %.1f°  PITCH = = %.1f°\n", KalmanAngleRoll, KalmanAnglePitch);
 
-	        // Algoritmo de correção de Offset
-	        gyroscope = FusionOffsetUpdate(&offset, gyroscope);
-
-	        // Calcular delta T (em segundos) para contabilizar no possível erro de clock
-			static clock_t previousTimestamp;
-			const float deltaTime = (float) (timestamp - previousTimestamp)/ (float) CLOCKS_PER_SEC;
-			previousTimestamp = timestamp;
-
-	        FusionAhrsUpdateNoMagnetometer(&ahrs, gyroscope, accelerometer, 0.01f);
-			const FusionVector linearAcceleration = FusionAhrsGetLinearAcceleration(&ahrs);
-			const FusionEuler euler = FusionQuaternionToEuler(FusionAhrsGetQuaternion(&ahrs));
+	//		printf("rate = %.1f°  anlge = = %.1f°\n", RateRoll, AngleRoll);
 
 
-			printf("ACCEL_X = %.1fg\n", linearAcceleration.axis.x);
-			printf("ACCEL_Y = %.1fg\n", linearAcceleration.axis.y);
-			printf("ACCEL_Z = %.1fg\n\n", linearAcceleration.axis.z);
-
-//			ACCEL_Y = (int)(linearAcceleration.axis.y * 100 + 0.5) / 100.0;
-//			if(stationary){
-//				VELOC_FILTERED = 0;
-//			}
-//			else{
-//				VELOC_FILTERED += ((ACCEL_Y*9.81) * sampleperiod) * 3,6;
-//			}
-//			POS_FILTERED += VELOC_FILTERED * sampleperiod;
-//
-//			printf("POS = %.1fm\n\n", POS_FILTERED);
 
 			//Resetando os acumuladores
 			ACCEL_X = 0;
@@ -253,12 +173,6 @@ int main(void)
 			RAW_ACCEL_Y = 0;
 			RAW_ACCEL_Z = 0;
 			Sensor_Data_Ready = FALSE;
-			contador++;
-
-//			if(contador == 500){
-//				POS_FILTERED = 0;
-//				VELOC_FILTERED = 0;
-//			}
 
 		}
 		/* USER CODE END WHILE */
@@ -783,6 +697,37 @@ float passa_alta_butterworth(float new_input, float *x, float *y) {
     }
 
     return y[0];
+}
+
+void kalman_1d(float *KalmanState, float *KalmanUncertainty, float *KalmanInput, float *KalmanMeasurement) {
+
+  *KalmanState = *KalmanState + 0.004 * *KalmanInput;
+  *KalmanUncertainty = *KalmanUncertainty + 0.004 * 0.004 * 4.0 * 4.0;
+
+  float KalmanGain = *KalmanUncertainty * 1.0/(1.0**KalmanUncertainty + 3.0 * 3.0);
+
+  *KalmanState = *KalmanState + KalmanGain * (*KalmanMeasurement - *KalmanState);
+  *KalmanUncertainty = (1.0 - KalmanGain) * *KalmanUncertainty;
+  Kalman1DOutput[0] = *KalmanState;
+  Kalman1DOutput[1] = *KalmanUncertainty;
+}
+
+void gyro_signals(void) {
+	RAW_ACCEL_X = (((uint16_t) Rx_Data[1] << 8) | (Rx_Data[2]));
+	RAW_ACCEL_Y = (((uint16_t) Rx_Data[3] << 8) | (Rx_Data[4]));
+	RAW_ACCEL_Z = (((uint16_t) Rx_Data[5] << 8) | (Rx_Data[6]));
+	RAW_GYRO_X = (((int16_t) Rx_Data[9] << 8) | (Rx_Data[10]));
+	RAW_GYRO_Y = (((int16_t) Rx_Data[11] << 8) | (Rx_Data[12]));
+	RAW_GYRO_Z = (((int16_t) Rx_Data[13] << 8) | (Rx_Data[14]));
+
+	RateRoll = (float) RAW_GYRO_X / 131.0;
+	RatePitch = (float) RAW_GYRO_Y / 131.0;
+	RateYaw = (float) RAW_GYRO_Z / 131.0;
+	ACCEL_X = (float) RAW_ACCEL_X / 16384.0;
+	ACCEL_Y = (float) RAW_ACCEL_Y / 16384.0;
+	ACCEL_Z = (float) RAW_ACCEL_Z / 16384.0;
+	AngleRoll = atan(ACCEL_Y / sqrt(ACCEL_X * ACCEL_X + ACCEL_Z * ACCEL_Z)) * 1 / (3.142/180.0);
+	AnglePitch = -atan(ACCEL_X / sqrt(ACCEL_Y * ACCEL_Y + ACCEL_Z * ACCEL_Z)) * 1 /(3.142/180.0);
 }
 
 /* USER CODE END 4 */
