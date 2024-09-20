@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "Fusion/Fusion.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -30,7 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include "DEFINES_SAFT.h"
+#include "DEFINES.h"
 #include "Utility.h"
 
 /* USER CODE END Includes */
@@ -115,7 +114,7 @@ int main(void)
 
   	SPI2_Init();		//inicialização da interface SPI2
 
-	printf("\n--------  Exemplo de aplicação de uso MPU-9250 via SPI  --------\n\n");
+	printf("\n--------  Exemplo de aplicação de uso MPU-6500 via SPI  --------\n\n");
 
 	MPU6500_Config();
 	MPU6500_Offset_Cancellation();
@@ -126,31 +125,11 @@ int main(void)
 	DMA1_Config();
 	PB9_Int_Config();
 
-	//Iniciando as váriaveis dos valores do sensor
-	ACCEL_X = 0;
-	ACCEL_Y = 0;
-	ACCEL_Z = 0;
-	GYRO_X = 0;
-	GYRO_Y = 0;
-	GYRO_Z = 0;
-
   while (1) {
 
 		if (Sensor_Data_Ready) {
 
-//			printf("%.2f\n", ACCEL_FILTERED);
-//			printf("Dados do sensor:\n");
-//			printf("%.1f, %.1f\n", GYRO_X, filtro_complementar);
-//			printf("ACCEL = %.3fg\n\n", ACCEL_FILTERED);
-//			printf("GYRO_X = %.1f°/s\n", filtro_complementar);
-//			printf("GYRO_Y = %.1f°/s\n", GYRO_Y);
-//			printf("GYRO_Z = %.1f°/s\n\n", GYRO_Z);
-//			printf("TEMP = %.1f°C\n\n\n", temperatura);
-
 			gyro_signals();
-			//RateRoll -= RateCalibrationRoll;
-		    //RatePitch -= RateCalibrationPitch;
-		    //RateYaw -= RateCalibrationYaw;
 
 		    kalman_1d(&KalmanAngleRoll, &KalmanUncertaintyAngleRoll, &RateRoll, &AngleRoll);
 			KalmanAngleRoll = Kalman1DOutput[0];
@@ -161,17 +140,6 @@ int main(void)
 
 			printf("ROLL = %.1f°  PITCH = = %.1f°\n", KalmanAngleRoll, KalmanAnglePitch);
 
-	//		printf("rate = %.1f°  anlge = = %.1f°\n", RateRoll, AngleRoll);
-
-
-
-			//Resetando os acumuladores
-			ACCEL_X = 0;
-			ACCEL_Y = 0;
-			ACCEL_Z = 0;
-			RAW_ACCEL_X = 0;
-			RAW_ACCEL_Y = 0;
-			RAW_ACCEL_Z = 0;
 			Sensor_Data_Ready = FALSE;
 
 		}
@@ -373,361 +341,11 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 
 }
 
-void bmp280_altitude_cTemp(){
-
-	float po = 1013.25;
-	float T, P, sumTemp, sumPress, Pmed, Tmed = 0;
-	sumTemp = 0;
-	sumPress = 0;
-
-			for (int i = 0; i < 10; i++) {
-				T = 0;							//temperatura
-				P = 0;							//pressão
-				BMP280_Measures(&T, &P);		//medição da temperatura e pressão
-				sumTemp += T;
-				sumPress += P;
-				HAL_Delay(100);
-			}
-
-			Tmed = sumTemp / 10.0f;
-			Pmed = sumPress / 10.0f;
-
-			//Imprimindo os valores de temperatura e pressão medidos
-			printf("Temperatura Media = %.2f °C\n", Tmed);
-			printf("Pressão Media= %.2f hPa\n", Pmed);
-
-			//Estimativa da altitude
-			float altitude = (((pow((Pmed) / po, (1.0f / 5.255f)) - 1) * (Tmed + 273.15)) / 0.0065f) * - 1; //equação barométrica
-			printf("Altitude(Temp):		%.0f m       ", altitude);
-}
-
-void bmp280_altitude_sTemp(){
-
-	float po = 1013.25;
-	float T, P, sumTemp, sumPress, Pmed, Tmed = 0;
-	sumTemp = 0;
-	sumPress = 0;
-
-	for (int i = 0; i < 10; i++) {
-		T = 0;							//temperatura
-		P = 0;							//pressão
-		BMP280_Measures(&T, &P);		//medição da temperatura e pressão
-		sumTemp += T;
-		sumPress += P;
-		HAL_Delay(100);
-	}
-
-	Tmed = sumTemp / 10.0f;
-	Pmed = sumPress / 10.0f;
-
-	//Imprimindo os valores de temperatura e pressão medidos
-	printf("Temperatura Media = %.2f °C\n", Tmed);
-	printf("Pressão Media= %.2f hPa\n", Pmed);
-
-	//Estimativa da altitude
-	float altitude = 44330.0f * (1.0 - pow((Pmed) / po, (1.0f / 5.255f))); //equação barométrica
-	printf("Altitude:		%.0f m\n\n\n\n", altitude);
-
-}
-
-void bmp280_amostragem_dados() {
-
-	float T, P, sumTemp, sumPress, Pmed, Tmed = 0;
-	sumTemp = 0;
-	sumPress = 0;
-
-	for (int i = 0; i < 50; i++) {
-		T = 0;							//temperatura
-		P = 0;							//pressão
-		BMP280_Measures(&T, &P);		//medição da temperatura e pressão
-		sumTemp += T;
-		sumPress += P;
-		HAL_Delay(100);
-	}
-
-	Tmed = sumTemp / 50.0f;
-	Pmed = sumPress / 50.0f;
-
-	printf("%.4f, %.4f\n", Pmed, Tmed);
-
-}
-
-void bmp280_comparacao_2sensores() {
-
-	float T, P, T_2, P_2, sumTemp, sumPress, sumTemp_2, sumPress_2, Pmed, Tmed,
-			Pmed_2, Tmed_2 = 0;
-
-	sumTemp = sumPress = sumTemp_2 = sumPress_2 = 0;
-	for (int i = 0; i < 50; i++) {
-		T = P = T_2 = P_2 = 0;
-		BMP280_Measures(&T, &P);		//medição da temperatura e pressão
-		sumTemp += T;
-		sumPress += P;
-		BMP280_Measures_2(&T_2, &P_2);		//medição da temperatura e pressão
-		sumTemp_2 += T_2;
-		sumPress_2 += P_2;
-		HAL_Delay(100);
-	}
-
-	Pmed = sumPress / 50.0f;
-	Tmed = sumTemp / 50.0f;
-	Pmed_2 = sumPress_2 / 50.0f;
-	Tmed_2 = sumTemp_2 / 50.0f;
-
-//	float altitude =
-//			(((pow((Pmed) / Po, (1.0f / 5.255f)) - 1) * (Tmed + 273.15))
-//					/ 0.0065f) * -1;
-//	float altitude2 = (((pow((Pmed_2) / Po, (1.0f / 5.255f)) - 1)
-//			* (Tmed_2 + 273.15)) / 0.0065f) * -1;
-//	printf("Temp bmp1 = %.2f     ", Tmed);
-//	printf("Temp bmp2 = %.2f\n", Tmed_2);
-//	printf("Pres bmp1 =  %.2f     ", Pmed);
-//	printf("Pres bmp2 =  %.2f\n", Pmed_2);
-//	printf("Alti bmp1=    %.2f     ", altitude);
-//	printf("Alti bmp2 =    %.2f\n\n\n\n", altitude2);
-
-	printf("%.4f,%.4f,%.4f,%.4f\n", Pmed, Tmed, Pmed_2, Tmed_2);
-
-}
-
-void mpu_9250_offsets() {
-
-	uint8_t rawData[14];							//valores crus dos sensores
-	int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
-	int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-	int somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y, somGyros_z = 0;
-
-	//leitura e separação dos valores crus dos sensores
-
-	for(int i=0; i < 10 ;i++){
-	Read_MData(0x3B, 14, rawData);
-	RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1]); //+ RAW_ACCEL_X_OFFSET;
-	RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3]); //+ RAW_ACCEL_Y_OFFSET;
-	RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5]); //+ RAW_ACCEL_Z_OFFSET;
-	RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9]); // + RAW_GYRO_X_OFFSET;
-	RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11]); //+ RAW_GYRO_Y_OFFSET;
-	RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13]); //+ RAW_GYRO_Z_OFFSET;
-	somAccel_x += RAW_ACCEL_X;
-	somAccel_y += RAW_ACCEL_Y;
-	somAccel_z += RAW_ACCEL_Z;
-	somGyros_x += RAW_GYRO_X;
-	somGyros_y += RAW_GYRO_Y;
-	somGyros_z += RAW_GYRO_Z;
-	HAL_Delay(10);
-	}
-
-	somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /= 10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
-
-	//impressão dos valores escalonados
-	printf("Impressão dos valores crus:\n");
-	printf("ACCEL_X = %d\n", somAccel_x);
-	printf("ACCEL_Y = %d\n", somAccel_y);
-	printf("ACCEL_Z = %d\n\n", somAccel_z);
-
-	printf("GYRO_X = %d\n", somGyros_x);
-	printf("GYRO_Y = %d\n", somGyros_y);
-	printf("GYRO_Z = %d\n\n\n", somGyros_z);
-
-	somAccel_x = somAccel_y = somAccel_z = somGyros_x = somGyros_y = somGyros_z = 0;
-
-}
-//void mpu_9250_amostras(void){
-//	uint8_t rawData[14];							//valores crus dos sensores
-//		int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
-//		int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-//		int16_t RAW_TEMP;								//valor cru da temperatura
-//
-//		Read_MData(0x3B, 14, rawData);
-//		RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
-//				+ RAW_ACCEL_X_OFFSET;
-//		RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
-//				+ RAW_ACCEL_Y_OFFSET;
-//		RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
-//				+ RAW_ACCEL_Z_OFFSET;
-//		RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
-//		RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9]) + RAW_GYRO_X_OFFSET;
-//		RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
-//				+ RAW_GYRO_Y_OFFSET;
-//		RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
-//				+ RAW_GYRO_Z_OFFSET;
-//
-//		somAccel_x += RAW_ACCEL_X;
-//		somAccel_y += RAW_ACCEL_Y;
-//		somAccel_z += RAW_ACCEL_Z;
-//		somGyros_x += RAW_GYRO_X;
-//		somGyros_y += RAW_GYRO_Y;
-//		somGyros_z += RAW_GYRO_Z;
-//		temp = RAW_TEMP;
-//		contador += 1;
-//
-//		if(contador == 10){
-//			somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
-//					10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
-//			somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
-//					accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
-//					gyroScalingFactor, somGyros_z *= gyroScalingFactor;
-//}
-//		teste=0;
-//}
-//void mpu_9250_amostras() {
-//
-//	const float accelScalingFactor = ((float) 4 / 32768); //fator de escala do acelerômetro
-//	const float gyroScalingFactor = ((float) 500 / 32768); //fator de escala do giroscópio
-//
-//	uint8_t rawData[14];							//valores crus dos sensores
-//	int16_t RAW_ACCEL_X, RAW_ACCEL_Y, RAW_ACCEL_Z;//valores crus do acelerômetro
-//	int16_t RAW_GYRO_X, RAW_GYRO_Y, RAW_GYRO_Z;		//valores crus do giroscópio
-//	int16_t RAW_TEMP;								//valor cru da temperatura
-//	float somAccel_x, somAccel_y, somAccel_z, somGyros_x, somGyros_y,
-//			somGyros_z = 0;
-//
-//	for (int i = 0; i < 10; i++) {
-//		//leitura e separação dos valores crus dos sensores
-//		Read_MData(0x3B, 14, rawData);
-//		RAW_ACCEL_X = ((int16_t) rawData[0] << 8) + (rawData[1])
-//				+ RAW_ACCEL_X_OFFSET;
-//		RAW_ACCEL_Y = ((int16_t) rawData[2] << 8) + (rawData[3])
-//				+ RAW_ACCEL_Y_OFFSET;
-//		RAW_ACCEL_Z = ((int16_t) rawData[4] << 8) + (rawData[5])
-//				+ RAW_ACCEL_Z_OFFSET;
-//		RAW_TEMP = ((int16_t) rawData[6] << 8) + (rawData[7]);
-//		RAW_GYRO_X = ((int16_t) rawData[8] << 8) + (rawData[9])
-//				+ RAW_GYRO_X_OFFSET;
-//		RAW_GYRO_Y = ((int16_t) rawData[10] << 8) + (rawData[11])
-//				+ RAW_GYRO_Y_OFFSET;
-//		RAW_GYRO_Z = ((int16_t) rawData[12] << 8) + (rawData[13])
-//				+ RAW_GYRO_Z_OFFSET;
-//
-//		somAccel_x += RAW_ACCEL_X;
-//		somAccel_y += RAW_ACCEL_Y;
-//		somAccel_z += RAW_ACCEL_Z;
-//		somGyros_x += RAW_GYRO_X;
-//		somGyros_y += RAW_GYRO_Y;
-//		somGyros_z += RAW_GYRO_Z;
-//		HAL_Delay(10);
-//	}
-//	somAccel_x /= 10.f, somAccel_y /= 10.f, somAccel_z /= 10.f, somGyros_x /=
-//			10.f, somGyros_y /= 10.f, somGyros_z /= 10.f;
-//	somAccel_x *= accelScalingFactor, somAccel_y *= accelScalingFactor, somAccel_z *=
-//			accelScalingFactor, somGyros_x *= gyroScalingFactor, somGyros_y *=
-//			gyroScalingFactor, somGyros_z *= gyroScalingFactor;
-//
-//	//impressão dos valores escalonados
-//	printf("Impressão dos valores escalonados:\n");
-//	printf("ACCEL_X = %.1f\n", somAccel_x);
-//	printf("ACCEL_Y = %.1f\n", somAccel_y);
-//	printf("ACCEL_Z = %.1f\n\n", somAccel_z);
-//	printf("GYRO_X = %.0f\n", somGyros_x);
-//	printf("GYRO_Y = %.0f\n", somGyros_y);
-//	printf("GYRO_Z = %.0f\n\n", somGyros_z);
-//
-//	printf("TEMP = %.1f°C\n\n\n\n", (float) RAW_TEMP / 333.87 + 21.0);
-//}
-
 void DMA1_Stream3_IRQHandler(void)
 {
 	DMA1->LIFCR |= 0b111101 << 22;	//limpa as flags de interrupção
 	GPIOD->ODR |= (1 << 12);		//faz o pino CS ir para nível alto (finaliza o comando SPI)
 	Sensor_Data_Ready = TRUE;		//sinaliza que os dados estão prontos para processamento
-}
-
-void DMA1_Config(void)
-{
-	//Configuração do canal 0 do stream 4 do DMA1 (SPI2_TX)
-	RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;			//habilita o clock da interface do DMA1
-
-	DMA1_Stream4->PAR = (uint32_t) &(SPI2->DR);	//ponteiro do periférico para onde os dados devem ser transferidos
-	DMA1_Stream4->CR &= ~DMA_SxCR_CHSEL;		//seleciona canal 0
-	DMA1_Stream4->NDTR = 15;					//quantidade de dados a serem transferidos para o periférico
-	DMA1_Stream4->CR |= DMA_SxCR_DIR_0;			//direção da memória para o periférico
-	DMA1_Stream4->CR |= DMA_SxCR_MINC;			//ponteiro da memória pós incrementado automaticamente
-	DMA1_Stream4->CR &= ~DMA_SxCR_PINC;			//ponteiro do periférico fixo
-	DMA1_Stream4->CR &= ~DMA_SxCR_PSIZE;		//tamanho do dado do periférico (8 bits)
-	DMA1_Stream4->CR &= ~DMA_SxCR_MSIZE;		//tamanho do dado na memória (8 bits)
-	DMA1_Stream4->FCR &= ~DMA_SxFCR_DMDIS;		//habilita o modo de transferência direta (sem FIFO)
-
-	//Configuração do canal 0 do stream 3 do DMA1 (SPI2_RX)
-	DMA1_Stream3->PAR = (uint32_t) &(SPI2->DR);	//ponteiro do periférico de onde os dados devem ser transferidos
-	DMA1_Stream3->CR &= ~DMA_SxCR_CHSEL;		//seleciona canal 0
-	DMA1_Stream3->NDTR = 15;					//quantidade de dados a serem transferidos para a memória
-	DMA1_Stream3->CR &= ~DMA_SxCR_DIR;			//direção do periférico para a memória
-	DMA1_Stream3->CR |= DMA_SxCR_MINC;			//ponteiro da memória pós incrementado automaticamente
-	DMA1_Stream3->CR &= ~DMA_SxCR_PINC;			//ponteiro do periférico fixo
-	DMA1_Stream3->CR &= ~DMA_SxCR_PSIZE;		//tamanho do dado do periférico (8 bits)
-	DMA1_Stream3->CR &= ~DMA_SxCR_MSIZE;		//tamanho do dado na memória (8 bits)
-	DMA1_Stream3->FCR &= ~DMA_SxFCR_DMDIS;		//habilita o modo de transferência direta (sem FIFO)
-
-	DMA1_Stream3->CR |= DMA_SxCR_TCIE;			//habilita a interrupção de transferência completa do Stream3 do DMA1
-	//NVIC_EnableIRQ(DMA1_Stream3_IRQn);			//habilita a interrupção no NVIC
-	HAL_NVIC_SetPriority(DMA1_Stream3_IRQn, 0, 0);
-	HAL_NVIC_EnableIRQ(DMA1_Stream3_IRQn);
-}
-
-void PB9_Int_Config(void)
-{
-	//Configuração do pino PB9 como entrada digital com resistor de pull-down
-	RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;	//habilita o clock do GPIOB
-	GPIOB->MODER &= ~(0b11 << 18);			//seleciona modo de entrada digital no pino PB9
-	GPIOB->PUPDR |= 0b10 << 18;				//habilita o resistor de pull-down no pino PB9
-
-	//Configuração da EXTI9 para receber pulsos externos em PB9
-	RCC->APB2ENR |= RCC_APB2ENR_SYSCFGEN;	//habilita o clock de SYSCFG
-	SYSCFG->EXTICR[2] |= 0b0001 << 4;		//seleciona PB9 como gatilho de EXTI9
-	EXTI->RTSR |= 1 << 9;			 		//habilita a detecção por borda de subida em PB9
-	EXTI->IMR |= 1 << 9;				 	//habilita a interrupção EXTI9 no controlador EXTI
-	NVIC_EnableIRQ(EXTI9_5_IRQn);			//habilita a interrupção EXTI9 no NVIC
-}
-
-float passa_alta_butterworth(float new_input, float *x, float *y) {
-
-//    //atualizando as amostras de entrada
-    for (int i = 0; i < 4; i++) {			//Atualizar a lista de entradas
-           x[4-i] = x[3-i];
-       }
-
-    x[0] = new_input;						//Ultima amostra obtida
-
-    y[0] = b[0]*x[0] + b[1]*x[1] + b[2]*x[2] + b[3]*x[3] + b[4]*x[4]
-
-    		 - a[1]*y[1] - a[2]*y[2] - a[3]*y[3] - a[4]*y[4];
-
-    //    //atualizando as amostras de saída
-    for (int i = 0; i < 4; i++) {			// Atualizar a lista de saídas
-        y[4-i] = y[3-i];
-    }
-
-    return y[0];
-}
-
-void kalman_1d(float *KalmanState, float *KalmanUncertainty, float *KalmanInput, float *KalmanMeasurement) {
-
-  *KalmanState = *KalmanState + 0.004 * *KalmanInput;
-  *KalmanUncertainty = *KalmanUncertainty + 0.004 * 0.004 * 4.0 * 4.0;
-
-  float KalmanGain = *KalmanUncertainty * 1.0/(1.0**KalmanUncertainty + 3.0 * 3.0);
-
-  *KalmanState = *KalmanState + KalmanGain * (*KalmanMeasurement - *KalmanState);
-  *KalmanUncertainty = (1.0 - KalmanGain) * *KalmanUncertainty;
-  Kalman1DOutput[0] = *KalmanState;
-  Kalman1DOutput[1] = *KalmanUncertainty;
-}
-
-void gyro_signals(void) {
-	RAW_ACCEL_X = (((uint16_t) Rx_Data[1] << 8) | (Rx_Data[2]));
-	RAW_ACCEL_Y = (((uint16_t) Rx_Data[3] << 8) | (Rx_Data[4]));
-	RAW_ACCEL_Z = (((uint16_t) Rx_Data[5] << 8) | (Rx_Data[6]));
-	RAW_GYRO_X = (((int16_t) Rx_Data[9] << 8) | (Rx_Data[10]));
-	RAW_GYRO_Y = (((int16_t) Rx_Data[11] << 8) | (Rx_Data[12]));
-	RAW_GYRO_Z = (((int16_t) Rx_Data[13] << 8) | (Rx_Data[14]));
-
-	RateRoll = (float) RAW_GYRO_X / 131.0;
-	RatePitch = (float) RAW_GYRO_Y / 131.0;
-	RateYaw = (float) RAW_GYRO_Z / 131.0;
-	ACCEL_X = (float) RAW_ACCEL_X / 16384.0;
-	ACCEL_Y = (float) RAW_ACCEL_Y / 16384.0;
-	ACCEL_Z = (float) RAW_ACCEL_Z / 16384.0;
-	AngleRoll = atan(ACCEL_Y / sqrt(ACCEL_X * ACCEL_X + ACCEL_Z * ACCEL_Z)) * 1 / (3.142/180.0);
-	AnglePitch = -atan(ACCEL_X / sqrt(ACCEL_Y * ACCEL_Y + ACCEL_Z * ACCEL_Z)) * 1 /(3.142/180.0);
 }
 
 /* USER CODE END 4 */
