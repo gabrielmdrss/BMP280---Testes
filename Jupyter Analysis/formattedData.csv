@@ -1,4 +1,4 @@
-Data,Hora,Pressao Atmosferica,Temperatura,Altitude Primeira fórmula(S/T),Altitude Segunda fórmula(C/T)
+Date,Time,Atmospheric pressure,Temperature,Altitude First formula(without Temp),Altitude Second formula(with Temp)
 2024/05/07, 09:53,957.6511,30.5261,473.52,499.05
 2024/05/07, 09:53,957.6496,30.5538,473.54,499.11
 2024/05/07, 09:53,957.6395,30.5791,473.62,499.24
